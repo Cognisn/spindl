@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spindl"
+dynamic = ["version"]
+description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    { name = "Matthew Westwood-Hill" },
+]
+dependencies = [
+    "mcp>=1.25.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+http = [
+    "uvicorn>=0.30.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "mypy>=1.8.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {file = "src/spindl/_version.txt"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+strict = true
