@@ -36,7 +36,6 @@ class MCPServer:
         self,
         prefix: str,
         spooler: Optional[SpoolerConfig] = None,
-        read_only: bool = False,
         server_name: Optional[str] = None,
     ) -> None:
         """Initialise the MCP server.
@@ -46,13 +45,10 @@ class MCPServer:
             spooler: SpoolerConfig to enable response spooling.
                 If provided, the 4 spooler query tools are
                 auto-registered.
-            read_only: If True, tools with is_write_operation=True
-                are silently skipped during registration.
             server_name: MCP server name. Defaults to the prefix.
         """
         self._prefix_resolver = PrefixResolver(prefix)
         self._registry = ToolRegistry(self._prefix_resolver)
-        self._read_only = read_only
         self._server_name = server_name or prefix
         self._spooler: Optional[ResponseSpooler] = None
         self._spooler_config = spooler
@@ -60,16 +56,7 @@ class MCPServer:
         self._setup_done = False
 
     def register(self, tool: BaseTool) -> None:
-        """Register a tool with the server.
-
-        Write-operation tools are silently skipped if the server
-        is in read-only mode.
-        """
-        if self._read_only and tool.is_write_operation:
-            logger.debug(
-                "Skipping write tool '%s' (read-only mode)", tool.name
-            )
-            return
+        """Register a tool with the server."""
         self._registry.register(tool)
 
     def register_all(self, tools: list[BaseTool]) -> None:

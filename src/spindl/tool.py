@@ -47,7 +47,6 @@ class BaseTool:
     name: str = ""
     description: str = ""
     category: str = ""
-    is_write_operation: bool = False
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
     InputModel: type[BaseModel] | None = None

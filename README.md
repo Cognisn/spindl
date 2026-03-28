@@ -229,7 +229,6 @@ class SearchVulns(BaseTool):
 | `name` | `str` | `""` | Bare tool name (required) |
 | `description` | `str` | `""` | Short one-line description (required) |
 | `category` | `str` | `""` | Grouping key for skills guide (required) |
-| `is_write_operation` | `bool` | `False` | Filtered out in read-only mode |
 | `spooler_array_paths` | `list[str] \| None` | `None` | Dot-notation paths to arrays to spool |
 | `spooler_auto_detect` | `bool` | `False` | Auto-detect large arrays in response |
 | `InputModel` | `type[BaseModel] \| None` | `None` | Pydantic model for input validation |
@@ -359,16 +358,6 @@ For streaming connections. Requires `pip install spindl[http]`.
 asyncio.run(server.run_sse(host="0.0.0.0", port=8000))
 ```
 
-## Read-Only Mode
-
-Filter out write-operation tools:
-
-```python
-server = MCPServer(prefix="secops", read_only=True)
-server.register(ReadTool())   # Registered
-server.register(WriteTool())  # Silently skipped (is_write_operation=True)
-```
-
 ## Response Types
 
 Spindl includes self-contained response types for consistent tool output:
@@ -405,7 +394,6 @@ return StructuredError(
 MCPServer(
     prefix: str,                         # Mandatory server prefix
     spooler: SpoolerConfig | None,       # Enable response spooling
-    read_only: bool = False,             # Filter write-operation tools
     server_name: str | None = None,      # MCP server name (defaults to prefix)
 )
 ```
@@ -427,7 +415,6 @@ class MyTool(BaseTool):
     name: str               # Bare name (e.g. "get_devices")
     description: str        # Short description
     category: str           # Grouping key
-    is_write_operation: bool = False
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
     InputModel: type[BaseModel] | None = None

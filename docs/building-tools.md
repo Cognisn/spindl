@@ -16,7 +16,6 @@ class MyTool(BaseTool):
     category = "my_category"    # For skills guide grouping
 
     # Optional class attributes
-    is_write_operation = False
     spooler_array_paths = None
     spooler_auto_detect = False
     InputModel = None            # Pydantic BaseModel subclass
@@ -242,23 +241,6 @@ An array is spooled when **both** conditions are met:
 2. The array exceeds `max_inline_items` (default: 10) OR `max_inline_tokens` (default: 2000)
 
 Small arrays are returned inline as normal.
-
-## Write Operations
-
-Mark tools that modify data:
-
-```python
-class DeleteDevice(BaseTool):
-    name = "delete_device"
-    description = "Remove a device from monitoring"
-    category = "inventory"
-    is_write_operation = True
-
-    async def execute(self, **params) -> dict:
-        ...
-```
-
-When the server runs in `read_only=True` mode, write-operation tools are silently excluded from registration.
 
 ## Dependency Injection
 

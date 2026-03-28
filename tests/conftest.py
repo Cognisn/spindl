@@ -44,22 +44,6 @@ def sample_tool():
 
 
 @pytest.fixture
-def write_tool():
-    """A sample write-operation tool."""
-
-    class DeleteDevice(BaseTool):
-        name = "delete_device"
-        description = "Delete a device"
-        category = "inventory"
-        is_write_operation = True
-
-        async def execute(self, **params):
-            return {"success": True}
-
-    return DeleteDevice()
-
-
-@pytest.fixture
 def spooler_config(tmp_path):
     """A SpoolerConfig using a temp directory."""
     return SpoolerConfig(

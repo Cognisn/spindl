@@ -58,7 +58,6 @@ class TestBaseTool:
 
     def test_default_attributes(self):
         tool = BaseTool()
-        assert tool.is_write_operation is False
         assert tool.spooler_array_paths is None
         assert tool.spooler_auto_detect is False
         assert tool.InputModel is None

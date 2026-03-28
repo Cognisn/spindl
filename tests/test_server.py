@@ -47,23 +47,6 @@ class TestMCPServerSetup:
         names = [d.name for d in defs]
         assert "demo_spooler_list" not in names
 
-    @pytest.mark.asyncio
-    async def test_read_only_filters_write_tools(self, write_tool):
-        server = MCPServer(prefix="demo", read_only=True)
-        server.register(write_tool)
-        await server._setup()
-        defs = server._registry.get_mcp_tool_definitions()
-        names = [d.name for d in defs]
-        assert "demo_delete_device" not in names
-
-    @pytest.mark.asyncio
-    async def test_read_only_allows_read_tools(self, sample_tool):
-        server = MCPServer(prefix="demo", read_only=True)
-        server.register(sample_tool)
-        await server._setup()
-        defs = server._registry.get_mcp_tool_definitions()
-        names = [d.name for d in defs]
-        assert "demo_get_devices" in names
 
 
 class TestMCPServerToolCalls:

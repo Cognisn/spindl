@@ -52,7 +52,6 @@ server.register(MyTool())
 
 - Tool is stored in the registry by its **bare name**
 - Bare name is registered with the `PrefixResolver` for `@placeholder` resolution
-- Write-operation tools are silently skipped if `read_only=True`
 
 ### 3. Setup (async, called once before transport starts)
 
