@@ -77,7 +77,7 @@ class MCPServer:
         # Initialise spooler if configured
         if self._spooler_config is not None:
             self._spooler = ResponseSpooler(self._spooler_config)
-            await self._spooler.initialise()
+            self._spooler.initialise()
             self._auto_register_spooler_tools()
 
         # Always register skills guide tools (last, so they see
@@ -367,4 +367,4 @@ class MCPServer:
     async def _cleanup(self) -> None:
         """Clean up resources on shutdown."""
         if self._spooler:
-            await self._spooler.cleanup()
+            self._spooler.cleanup()

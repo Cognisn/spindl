@@ -203,58 +203,17 @@ class QueryEngine:
                 {"function": "count", "column": "*", "alias": "total"}
             ]
 
-        agg_exprs = []
-        agg_aliases = []
-        for agg in aggregates:
-            func = agg.get("function", "").lower()
-            col = agg.get("column", "*")
-            alias = agg.get("alias", f"{func}_{col}")
+        agg_result = self._build_aggregate_exprs(
+            aggregates, valid_columns
+        )
+        if isinstance(agg_result, dict):
+            return agg_result
+        agg_exprs, agg_aliases = agg_result
 
-            if func not in ALLOWED_AGGREGATES:
-                return self._error(
-                    f"Invalid aggregate function '{func}'. "
-                    f"Allowed: {sorted(ALLOWED_AGGREGATES)}"
-                )
-
-            if func == "countdistinct":
-                if col == "*":
-                    return self._error(
-                        "countdistinct requires a column name, "
-                        "not '*'."
-                    )
-                if not self._is_valid_column(col, valid_columns):
-                    return self._error(
-                        f"Invalid column '{col}' for aggregation."
-                    )
-                safe_alias = re.sub(r"[^a-zA-Z0-9_]", "_", alias)
-                agg_exprs.append(
-                    f'COUNT(DISTINCT "{col}") AS "{safe_alias}"'
-                )
-                agg_aliases.append(safe_alias)
-                continue
-
-            if col != "*" and not self._is_valid_column(
-                col, valid_columns
-            ):
-                return self._error(
-                    f"Invalid column '{col}' for aggregation."
-                )
-
-            col_ref = "*" if col == "*" else f'"{col}"'
-            safe_alias = re.sub(r"[^a-zA-Z0-9_]", "_", alias)
-            agg_exprs.append(
-                f'{func.upper()}({col_ref}) AS "{safe_alias}"'
-            )
-            agg_aliases.append(safe_alias)
-
-        group_cols = []
-        if group_by:
-            for col in group_by:
-                if not self._is_valid_column(col, valid_columns):
-                    return self._error(
-                        f"Invalid group_by column '{col}'."
-                    )
-                group_cols.append(f'"{col}"')
+        group_result = self._build_group_cols(group_by, valid_columns)
+        if isinstance(group_result, dict):
+            return group_result
+        group_cols = group_result
 
         where_clause, where_params = self._build_where(
             filters, valid_columns
@@ -267,24 +226,196 @@ class QueryEngine:
             f"GROUP BY {', '.join(group_cols)}" if group_cols else ""
         )
 
-        select_parts = []
-        if group_cols:
-            select_parts.extend(group_cols)
-        select_parts.extend(agg_exprs)
+        select_parts = list(group_cols) + agg_exprs
         select_expr = ", ".join(select_parts)
 
-        order_clause = ""
-        if sort_by:
-            all_valid = (
-                [col.strip('"') for col in group_cols] + agg_aliases
-            )
-            if sort_by in all_valid or sort_by in valid_columns:
-                direction = (
-                    "DESC" if sort_order.lower() == "desc" else "ASC"
-                )
-                order_clause = f'ORDER BY "{sort_by}" {direction}'
+        order_clause = self._build_agg_order(
+            sort_by, sort_order, group_cols, agg_aliases, valid_columns
+        )
 
+        return self._execute_aggregate(
+            table_name=table_name,
+            select_expr=select_expr,
+            full_where=full_where,
+            group_clause=group_clause,
+            order_clause=order_clause,
+            where_params=where_params,
+            group_cols=group_cols,
+            agg_aliases=agg_aliases,
+            spool_id=spool_id,
+            group_by=group_by,
+            aggregates=aggregates,
+            filters=filters,
+            limit=limit,
+            page=page,
+            page_size=page_size,
+        )
+
+    def get_distinct_values(
+        self,
+        spool_id: str,
+        column: str,
+        limit: int = 50,
+    ) -> dict:
+        """Get distinct values for a column with frequency counts."""
+        registry = self._get_spool_registry(spool_id)
+        if not registry:
+            return self._error(f"Spool '{spool_id}' not found.")
+
+        table_name = registry["table_name"]
+        valid_columns = json.loads(registry["column_names"])
+
+        if not self._is_valid_column(column, valid_columns):
+            return self._error(
+                f"Invalid column '{column}'. "
+                f"Valid columns: {valid_columns}"
+            )
+
+        limit = min(max(1, limit), 500)
+
+        cursor = self.db.execute(
+            f'SELECT "{column}", COUNT(*) as count '
+            f'FROM "{table_name}" '
+            f'GROUP BY "{column}" '
+            f"ORDER BY count DESC LIMIT ?",
+            [limit],
+        )
+        rows = cursor.fetchall()
+
+        return {
+            "spool_id": spool_id,
+            "column": column,
+            "distinct_values": [
+                {"value": row[0], "count": row[1]} for row in rows
+            ],
+            "total_distinct": len(rows),
+        }
+
+    # ------------------------------------------------------------------
+    # Aggregate helpers
+    # ------------------------------------------------------------------
+
+    def _build_aggregate_exprs(
+        self,
+        aggregates: list[dict],
+        valid_columns: list[str],
+    ) -> tuple[list[str], list[str]] | dict:
+        """Build SQL aggregate expressions from aggregate definitions."""
+        agg_exprs = []
+        agg_aliases = []
+
+        for agg in aggregates:
+            func = agg.get("function", "").lower()
+            col = agg.get("column", "*")
+            alias = agg.get("alias", f"{func}_{col}")
+
+            if func not in ALLOWED_AGGREGATES:
+                return self._error(
+                    f"Invalid aggregate function '{func}'. "
+                    f"Allowed: {sorted(ALLOWED_AGGREGATES)}"
+                )
+
+            result = self._build_single_agg_expr(
+                func, col, alias, valid_columns
+            )
+            if isinstance(result, dict):
+                return result
+            agg_exprs.append(result)
+            agg_aliases.append(re.sub(r"\W", "_", alias))
+
+        return agg_exprs, agg_aliases
+
+    def _build_single_agg_expr(
+        self,
+        func: str,
+        col: str,
+        alias: str,
+        valid_columns: list[str],
+    ) -> str | dict:
+        """Build a single SQL aggregate expression."""
+        safe_alias = re.sub(r"\W", "_", alias)
+
+        if func == "countdistinct":
+            if col == "*":
+                return self._error(
+                    "countdistinct requires a column name, not '*'."
+                )
+            if not self._is_valid_column(col, valid_columns):
+                return self._error(
+                    f"Invalid column '{col}' for aggregation."
+                )
+            return f'COUNT(DISTINCT "{col}") AS "{safe_alias}"'
+
+        if col != "*" and not self._is_valid_column(col, valid_columns):
+            return self._error(
+                f"Invalid column '{col}' for aggregation."
+            )
+
+        col_ref = "*" if col == "*" else f'"{col}"'
+        return f'{func.upper()}({col_ref}) AS "{safe_alias}"'
+
+    def _build_group_cols(
+        self,
+        group_by: Optional[list[str]],
+        valid_columns: list[str],
+    ) -> list[str] | dict:
+        """Validate and build quoted group-by column references."""
+        if not group_by:
+            return []
+
+        group_cols = []
+        for col in group_by:
+            if not self._is_valid_column(col, valid_columns):
+                return self._error(
+                    f"Invalid group_by column '{col}'."
+                )
+            group_cols.append(f'"{col}"')
+        return group_cols
+
+    def _build_agg_order(
+        self,
+        sort_by: Optional[str],
+        sort_order: str,
+        group_cols: list[str],
+        agg_aliases: list[str],
+        valid_columns: list[str],
+    ) -> str:
+        """Build an ORDER BY clause for aggregate queries."""
+        if not sort_by:
+            return ""
+
+        all_valid = (
+            [col.strip('"') for col in group_cols] + agg_aliases
+        )
+        if sort_by in all_valid or sort_by in valid_columns:
+            direction = (
+                "DESC" if sort_order.lower() == "desc" else "ASC"
+            )
+            return f'ORDER BY "{sort_by}" {direction}'
+        return ""
+
+    def _execute_aggregate(
+        self,
+        *,
+        table_name: str,
+        select_expr: str,
+        full_where: str,
+        group_clause: str,
+        order_clause: str,
+        where_params: list,
+        group_cols: list[str],
+        agg_aliases: list[str],
+        spool_id: str,
+        group_by: Optional[list[str]],
+        aggregates: list[dict],
+        filters: Optional[list[dict]],
+        limit: int,
+        page: int,
+        page_size: Optional[int],
+    ) -> dict:
+        """Execute the aggregate query with optional pagination."""
         use_pagination = page_size is not None or page > 1
+
         if use_pagination:
             effective_page_size = min(
                 page_size or self.config.default_page_size,
@@ -354,46 +485,6 @@ class QueryEngine:
             }
 
         return result
-
-    def get_distinct_values(
-        self,
-        spool_id: str,
-        column: str,
-        limit: int = 50,
-    ) -> dict:
-        """Get distinct values for a column with frequency counts."""
-        registry = self._get_spool_registry(spool_id)
-        if not registry:
-            return self._error(f"Spool '{spool_id}' not found.")
-
-        table_name = registry["table_name"]
-        valid_columns = json.loads(registry["column_names"])
-
-        if not self._is_valid_column(column, valid_columns):
-            return self._error(
-                f"Invalid column '{column}'. "
-                f"Valid columns: {valid_columns}"
-            )
-
-        limit = min(max(1, limit), 500)
-
-        cursor = self.db.execute(
-            f'SELECT "{column}", COUNT(*) as count '
-            f'FROM "{table_name}" '
-            f'GROUP BY "{column}" '
-            f"ORDER BY count DESC LIMIT ?",
-            [limit],
-        )
-        rows = cursor.fetchall()
-
-        return {
-            "spool_id": spool_id,
-            "column": column,
-            "distinct_values": [
-                {"value": row[0], "count": row[1]} for row in rows
-            ],
-            "total_distinct": len(rows),
-        }
 
     # ------------------------------------------------------------------
     # Private helpers

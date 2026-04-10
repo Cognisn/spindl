@@ -58,9 +58,9 @@ def spooler_config(tmp_path):
 async def spooler(spooler_config):
     """An initialised ResponseSpooler with temp database."""
     s = ResponseSpooler(spooler_config)
-    await s.initialise()
+    s.initialise()
     yield s
-    await s.cleanup()
+    s.cleanup()
 
 
 @pytest.fixture

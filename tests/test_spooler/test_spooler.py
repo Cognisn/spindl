@@ -16,9 +16,9 @@ class TestResponseSpooler:
     @pytest.mark.asyncio
     async def test_initialise(self, spooler_config):
         s = ResponseSpooler(spooler_config)
-        await s.initialise()
+        s.initialise()
         assert s._initialised is True
-        await s.cleanup()
+        s.cleanup()
 
     def test_small_array_inline(self, spooler):
         result = spooler.process_response(

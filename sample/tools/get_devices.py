@@ -6,32 +6,42 @@ from pydantic import BaseModel, Field
 
 from spindl import BaseTool, ResponseEnvelope, ResponseMetadata
 
+# OS name constants
+OS_UBUNTU_22 = "Ubuntu 22.04"
+OS_UBUNTU_20 = "Ubuntu 20.04"
+OS_WIN_2022 = "Windows Server 2022"
+OS_WIN_2019 = "Windows Server 2019"
+OS_RHEL_9 = "RHEL 9"
+OS_RHEL_8 = "RHEL 8"
+OS_MACOS_14 = "macOS 14"
+OS_DEBIAN_12 = "Debian 12"
+
 # Fake device inventory data
 DEVICES = [
     {"id": f"DEV-{i:04d}", "hostname": f"srv-{i:04d}.corp.local",
      "os": os, "status": status, "ip": f"10.0.{i // 256}.{i % 256}",
      "location": loc, "owner": owner, "cpu_cores": cores, "ram_gb": ram}
     for i, (os, status, loc, owner, cores, ram) in enumerate([
-        ("Ubuntu 22.04", "online", "us-east-1", "platform-team", 8, 32),
-        ("Windows Server 2022", "online", "us-east-1", "infra-team", 16, 64),
-        ("RHEL 9", "online", "eu-west-1", "data-team", 32, 128),
-        ("Ubuntu 22.04", "degraded", "eu-west-1", "platform-team", 8, 32),
-        ("macOS 14", "online", "us-west-2", "eng-team", 10, 16),
-        ("Windows Server 2019", "offline", "us-east-1", "legacy-team", 4, 16),
-        ("Ubuntu 20.04", "online", "ap-south-1", "platform-team", 8, 32),
-        ("RHEL 8", "online", "eu-west-1", "data-team", 64, 256),
-        ("Ubuntu 22.04", "online", "us-west-2", "eng-team", 8, 32),
-        ("Windows Server 2022", "degraded", "us-east-1", "infra-team", 16, 64),
-        ("Debian 12", "online", "ap-south-1", "platform-team", 4, 16),
-        ("Ubuntu 22.04", "online", "eu-west-1", "eng-team", 8, 32),
-        ("RHEL 9", "offline", "us-east-1", "data-team", 32, 128),
-        ("Windows Server 2022", "online", "us-west-2", "infra-team", 16, 64),
-        ("Ubuntu 22.04", "online", "ap-south-1", "platform-team", 8, 32),
-        ("macOS 14", "online", "us-west-2", "eng-team", 10, 16),
-        ("RHEL 9", "online", "eu-west-1", "data-team", 32, 128),
-        ("Ubuntu 22.04", "degraded", "us-east-1", "platform-team", 8, 32),
-        ("Windows Server 2022", "online", "eu-west-1", "infra-team", 16, 64),
-        ("Ubuntu 20.04", "online", "us-west-2", "eng-team", 8, 32),
+        (OS_UBUNTU_22, "online", "us-east-1", "platform-team", 8, 32),
+        (OS_WIN_2022, "online", "us-east-1", "infra-team", 16, 64),
+        (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
+        (OS_UBUNTU_22, "degraded", "eu-west-1", "platform-team", 8, 32),
+        (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
+        (OS_WIN_2019, "offline", "us-east-1", "legacy-team", 4, 16),
+        (OS_UBUNTU_20, "online", "ap-south-1", "platform-team", 8, 32),
+        (OS_RHEL_8, "online", "eu-west-1", "data-team", 64, 256),
+        (OS_UBUNTU_22, "online", "us-west-2", "eng-team", 8, 32),
+        (OS_WIN_2022, "degraded", "us-east-1", "infra-team", 16, 64),
+        (OS_DEBIAN_12, "online", "ap-south-1", "platform-team", 4, 16),
+        (OS_UBUNTU_22, "online", "eu-west-1", "eng-team", 8, 32),
+        (OS_RHEL_9, "offline", "us-east-1", "data-team", 32, 128),
+        (OS_WIN_2022, "online", "us-west-2", "infra-team", 16, 64),
+        (OS_UBUNTU_22, "online", "ap-south-1", "platform-team", 8, 32),
+        (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
+        (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
+        (OS_UBUNTU_22, "degraded", "us-east-1", "platform-team", 8, 32),
+        (OS_WIN_2022, "online", "eu-west-1", "infra-team", 16, 64),
+        (OS_UBUNTU_20, "online", "us-west-2", "eng-team", 8, 32),
     ], start=0)
 ]
 

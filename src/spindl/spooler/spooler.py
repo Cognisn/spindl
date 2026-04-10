@@ -34,7 +34,7 @@ class ResponseSpooler:
     Usage::
 
         spooler = ResponseSpooler(config)
-        await spooler.initialise()
+        spooler.initialise()
 
         result = spooler.process_response(
             response=raw_response,
@@ -49,7 +49,7 @@ class ResponseSpooler:
         self._db: Optional[sqlite3.Connection] = None
         self._initialised = False
 
-    async def initialise(self) -> None:
+    def initialise(self) -> None:
         """Initialise the SQLite database and create schema tables."""
         if self._initialised:
             return
@@ -114,7 +114,7 @@ class ResponseSpooler:
         if not self._initialised:
             raise RuntimeError(
                 "Spooler not initialised. "
-                "Call await spooler.initialise() first."
+                "Call spooler.initialise() first."
             )
 
         # If the response itself is an array, wrap it
@@ -128,7 +128,7 @@ class ResponseSpooler:
             array_paths = self._detect_arrays(response)
 
         if not array_paths:
-            return self._size_guard(response, source_tool)
+            return self._size_guard(response)
 
         # Process each array path
         spooled_arrays = []
@@ -137,49 +137,58 @@ class ResponseSpooler:
         )
 
         for path in array_paths:
-            array_data = self._extract_path(response, path)
-            if array_data is None or not isinstance(array_data, list):
-                logger.warning(
-                    "Path '%s' did not resolve to an array, skipping.",
-                    path,
-                )
-                continue
-
-            if len(array_data) == 0:
-                remaining_response = self._set_path(
-                    remaining_response, path, []
-                )
-                continue
-
-            # Check if the array is small enough to return inline
-            estimated_tokens = self.config.estimate_tokens(
-                json.dumps(array_data)
+            spool_info = self._process_array_path(
+                response, remaining_response, path,
+                source_tool, description,
             )
-            if (
-                estimated_tokens <= self.config.max_inline_tokens
-                and len(array_data) <= self.config.max_inline_items
-            ):
-                remaining_response = self._set_path(
-                    remaining_response, path, array_data
-                )
-                continue
-
-            # Spool the array to SQLite
-            spool_info = self._spool_array(
-                array_data=array_data,
-                source_tool=source_tool,
-                array_path=path,
-                description=description,
-            )
-            spooled_arrays.append(spool_info)
+            if spool_info is not None:
+                spooled_arrays.append(spool_info)
 
         if not spooled_arrays:
-            return self._size_guard(remaining_response, source_tool)
+            return self._size_guard(remaining_response)
 
         return self._build_summary(
             remaining_response=remaining_response,
             spooled_arrays=spooled_arrays,
             source_tool=source_tool,
+        )
+
+    def _process_array_path(
+        self,
+        response: dict,
+        remaining_response: dict,
+        path: str,
+        source_tool: str,
+        description: Optional[str],
+    ) -> Optional[dict]:
+        """Process a single array path, returning spool info if spooled."""
+        array_data = self._extract_path(response, path)
+        if array_data is None or not isinstance(array_data, list):
+            logger.warning(
+                "Path '%s' did not resolve to an array, skipping.",
+                path,
+            )
+            return None
+
+        if len(array_data) == 0:
+            self._set_path(remaining_response, path, [])
+            return None
+
+        estimated_tokens = self.config.estimate_tokens(
+            json.dumps(array_data)
+        )
+        if (
+            estimated_tokens <= self.config.max_inline_tokens
+            and len(array_data) <= self.config.max_inline_items
+        ):
+            self._set_path(remaining_response, path, array_data)
+            return None
+
+        return self._spool_array(
+            array_data=array_data,
+            source_tool=source_tool,
+            array_path=path,
+            description=description,
         )
 
     def _detect_arrays(
@@ -494,7 +503,7 @@ class ResponseSpooler:
             },
         }
 
-    def _size_guard(self, response: dict, source_tool: str) -> dict:
+    def _size_guard(self, response: dict) -> dict:
         """Apply size guard to non-array responses."""
         serialised = json.dumps(response)
         estimated_tokens = self.config.estimate_tokens(serialised)
@@ -519,7 +528,7 @@ class ResponseSpooler:
         raw = f"{source_tool}:{array_path}:{timestamp}"
         return hashlib.sha256(raw.encode()).hexdigest()[:12]
 
-    async def cleanup(self) -> None:
+    def cleanup(self) -> None:
         """Close the database and optionally remove the file."""
         if self._db:
             self._db.close()

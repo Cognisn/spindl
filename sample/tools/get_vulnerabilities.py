@@ -29,7 +29,7 @@ _TITLES = [
 ]
 
 random.seed(42)  # deterministic for demo purposes
-VULNERABILITIES = [
+VULNERABILITIES = [  # NOSONAR - PRNG is intentional for deterministic sample data, not cryptographic use
     {
         "cve_id": f"{random.choice(_CVE_PREFIXES)}{random.randint(1000, 9999)}",
         "title": random.choice(_TITLES),
