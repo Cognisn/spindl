@@ -8,6 +8,7 @@
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
 [![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![SafeSkill 93/100](https://img.shields.io/badge/SafeSkill-93%2F100_Verified%20Safe-brightgreen)](https://safeskill.dev/scan/cognisn-spindl)
 
 A Python framework for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers with hierarchical tool name prefixing, on-demand skills guides, and built-in response spooling for large data sets.
 
