@@ -1,5 +1,14 @@
 # Spindl
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=bugs)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=Cognisn_spindl&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=Cognisn_spindl)
+
 A Python framework for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers with hierarchical tool name prefixing, on-demand skills guides, and built-in response spooling for large data sets.
 
 ## The Problem
@@ -17,19 +26,19 @@ Spindl solves this with three capabilities:
 ## Installation
 
 ```bash
-pip install spindl
+pip install cognisn-spindl
 ```
 
 For HTTP/SSE transport support:
 
 ```bash
-pip install spindl[http]
+pip install cognisn-spindl[http]
 ```
 
 For development:
 
 ```bash
-pip install spindl[dev]
+pip install cognisn-spindl[dev]
 ```
 
 ## Quick Start
@@ -342,7 +351,7 @@ asyncio.run(server.run_stdio())
 
 ### HTTP Streamable
 
-For networked deployments. Requires `pip install spindl[http]`.
+For networked deployments. Requires `pip install cognisn-spindl[http]`.
 
 ```python
 asyncio.run(server.run_http(host="0.0.0.0", port=8000))
@@ -352,7 +361,7 @@ The server reads the `X-Spindl-Prefix` header from each request for per-request 
 
 ### SSE (Server-Sent Events)
 
-For streaming connections. Requires `pip install spindl[http]`.
+For streaming connections. Requires `pip install cognisn-spindl[http]`.
 
 ```python
 asyncio.run(server.run_sse(host="0.0.0.0", port=8000))
