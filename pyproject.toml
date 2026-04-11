@@ -7,7 +7,7 @@ name = "cognisn-spindl"
 dynamic = ["version"]
 description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
 requires-python = ">=3.12"
-license = "MIT with Commons Clause"
+license = {file = "LICENSE"}
 authors = [
     { name = "Matthew Westwood-Hill" },
 ]
