@@ -22,6 +22,8 @@ Usage:
 import argparse
 import asyncio
 import logging
+import os
+import tempfile
 
 from spindl import MCPServer, SpoolerConfig
 
@@ -39,7 +41,7 @@ def build_server() -> MCPServer:
     server = MCPServer(
         prefix="inventory",
         spooler=SpoolerConfig(
-            db_path="/tmp/sample_spooler.db",
+            db_path=os.path.join(tempfile.gettempdir(), "sample_spooler.db"),
             max_inline_items=5,
             max_inline_tokens=1000,
             summary_sample_size=3,

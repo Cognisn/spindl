@@ -3,11 +3,11 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spindl"
+name = "cognisn-spindl"
 dynamic = ["version"]
 description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
 requires-python = ">=3.12"
-license = "MIT"
+license = "MIT with Commons Clause"
 authors = [
     { name = "Matthew Westwood-Hill" },
 ]

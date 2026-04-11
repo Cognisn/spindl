@@ -55,7 +55,7 @@ class TestSpoolerToolGuides:
 class TestSpoolerListSpools:
     @pytest.mark.asyncio
     async def test_list_with_data(self, spooler_with_data):
-        spooler, spool_id = spooler_with_data
+        spooler, _ = spooler_with_data
         tool = SpoolerListSpoolsTool(spooler=spooler)
         result = await tool.execute()
         assert result["success"] is True

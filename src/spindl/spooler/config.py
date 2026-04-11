@@ -5,6 +5,7 @@ or direct instantiation, with sensible defaults for container deployment.
 """
 
 import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,8 +15,8 @@ class SpoolerConfig:
     """Configuration for the response spooler.
 
     Attributes:
-        db_path: Path to the SQLite database file. Defaults to /tmp for
-                 container-friendly ephemeral storage.
+        db_path: Path to the SQLite database file. Defaults to the
+                 system temporary directory for ephemeral storage.
         max_inline_tokens: Estimated token count threshold above which
                           array data is spooled to SQLite rather than
                           returned inline. Default 2000 (~8000 chars).
@@ -36,7 +37,8 @@ class SpoolerConfig:
 
     db_path: str = field(
         default_factory=lambda: os.environ.get(
-            "SPOOLER_DB_PATH", "/tmp/mcp_spooler.db"
+            "SPOOLER_DB_PATH",
+            os.path.join(tempfile.gettempdir(), "mcp_spooler.db"),
         )
     )
     max_inline_tokens: int = field(
