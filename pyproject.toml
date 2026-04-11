@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cognisn-spindl"
 dynamic = ["version"]
 description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
+readme = "README.md"
 requires-python = ">=3.12"
 license = {file = "LICENSE"}
 authors = [
