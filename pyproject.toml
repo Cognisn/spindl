@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spindl"
+name = "cognisn-spindl"
 dynamic = ["version"]
 description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
 requires-python = ">=3.12"
