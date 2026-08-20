@@ -13,9 +13,11 @@ scope see everything, which is the behaviour when authentication is not
 enabled. Spools may also carry a ``ttl`` in seconds after which they are
 treated as absent.
 
-The protocol is synchronous. SQLite is in-process and the existing
-``ResponseSpooler.process_response`` contract is synchronous; a network
-backend can use a synchronous driver or bridge to its own event loop.
+The protocol is asynchronous because spindl's tool dispatch runs on the MCP
+SDK's event loop: a network backend (for example Postgres) must not block
+that loop, so it should use a native async driver or wrap a blocking one in
+``asyncio.to_thread``. The SQLite backend exposes thin ``async def`` methods
+over its local, sub-millisecond calls.
 """
 
 import json
@@ -35,13 +37,13 @@ logger = logging.getLogger(__name__)
 class SpoolBackend(Protocol):
     """Storage contract for spooled array data."""
 
-    def initialise(self) -> None:
+    async def initialise(self) -> None:
         """Open connections and create any schema. Idempotent."""
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         """Close connections and release resources."""
 
-    def create_spool(
+    async def create_spool(
         self,
         *,
         spool_id: str,
@@ -61,10 +63,10 @@ class SpoolBackend(Protocol):
         records) for the summary response.
         """
 
-    def list_spools(self, *, scope: Optional[str] = None) -> dict:
+    async def list_spools(self, *, scope: Optional[str] = None) -> dict:
         """Return ``{"total_spools": int, "spools": [...]}`` visible to ``scope``."""
 
-    def query(
+    async def query(
         self,
         spool_id: str,
         *,
@@ -80,7 +82,7 @@ class SpoolBackend(Protocol):
     ) -> dict:
         """Return a page of records, or ``{"error": {...}}``."""
 
-    def aggregate(
+    async def aggregate(
         self,
         spool_id: str,
         *,
@@ -96,7 +98,7 @@ class SpoolBackend(Protocol):
     ) -> dict:
         """Return grouped aggregates, or ``{"error": {...}}``."""
 
-    def distinct(
+    async def distinct(
         self,
         spool_id: str,
         column: str,
@@ -106,7 +108,7 @@ class SpoolBackend(Protocol):
     ) -> dict:
         """Return distinct values for ``column``, or ``{"error": {...}}``."""
 
-    def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
+    async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         """Remove a spool. Returns False if absent or not visible to ``scope``."""
 
 
@@ -126,9 +128,48 @@ class SQLiteSpoolBackend:
         self.config = config
         self._db: Optional[sqlite3.Connection] = None
 
+    # -- async protocol surface ---------------------------------------------
+    # SQLite calls are local and fast, so these await nothing; they exist so
+    # the SQLite backend satisfies the same contract as a network backend.
+
+    async def initialise(self) -> None:
+        self._sync_initialise()
+
+    async def cleanup(self) -> None:
+        self._sync_cleanup()
+
+    async def create_spool(self, **kwargs: Any) -> dict:
+        return self._sync_create_spool(**kwargs)
+
+    async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
+        return self._sync_delete_spool(spool_id, scope=scope)
+
+    async def list_spools(self, *, scope: Optional[str] = None) -> dict:
+        return self._sync_list_spools(scope=scope)
+
+    async def query(
+        self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
+    ) -> dict:
+        return self._sync_query(spool_id, scope=scope, **kw)
+
+    async def aggregate(
+        self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
+    ) -> dict:
+        return self._sync_aggregate(spool_id, scope=scope, **kw)
+
+    async def distinct(
+        self,
+        spool_id: str,
+        column: str,
+        *,
+        limit: Optional[int] = None,
+        scope: Optional[str] = None,
+    ) -> dict:
+        return self._sync_distinct(spool_id, column, limit=limit, scope=scope)
+
     # -- lifecycle -----------------------------------------------------------
 
-    def initialise(self) -> None:
+    def _sync_initialise(self) -> None:
         if self._db is not None:
             return
         self._db = sqlite3.connect(self.config.db_path)
@@ -141,7 +182,7 @@ class SQLiteSpoolBackend:
             self.config.db_path,
         )
 
-    def cleanup(self) -> None:
+    def _sync_cleanup(self) -> None:
         if self._db is None:
             return
         self._db.close()
@@ -193,7 +234,7 @@ class SQLiteSpoolBackend:
 
     # -- writes --------------------------------------------------------------
 
-    def create_spool(
+    def _sync_create_spool(
         self,
         *,
         spool_id: str,
@@ -262,7 +303,7 @@ class SQLiteSpoolBackend:
 
         return {"stats": stats, "sample": self._get_sample(table_name, columns)}
 
-    def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
+    def _sync_delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         db = self.connection
         row = self._visible_registry_row(spool_id, scope)
         if row is None:
@@ -275,7 +316,7 @@ class SQLiteSpoolBackend:
 
     # -- reads ---------------------------------------------------------------
 
-    def list_spools(self, *, scope: Optional[str] = None) -> dict:
+    def _sync_list_spools(self, *, scope: Optional[str] = None) -> dict:
         db = self.connection
         where, params = self._visibility_clause(scope)
         cursor = db.execute(
@@ -299,19 +340,21 @@ class SQLiteSpoolBackend:
         ]
         return {"total_spools": len(spools), "spools": spools}
 
-    def query(self, spool_id: str, *, scope: Optional[str] = None, **kw: Any) -> dict:
+    def _sync_query(
+        self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
+    ) -> dict:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
         return self._engine().query(spool_id=spool_id, **kw)
 
-    def aggregate(
+    def _sync_aggregate(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
     ) -> dict:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
         return self._engine().aggregate(spool_id=spool_id, **kw)
 
-    def distinct(
+    def _sync_distinct(
         self,
         spool_id: str,
         column: str,

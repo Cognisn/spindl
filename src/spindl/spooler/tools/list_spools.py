@@ -56,7 +56,7 @@ class SpoolerListSpoolsTool(BaseTool):
     async def execute(self, **params: Any) -> dict:
         try:
             self._spooler.require_initialised()
-            result = self._spooler.backend.list_spools(
+            result = await self._spooler.backend.list_spools(
                 scope=self._spooler.current_scope()
             )
 

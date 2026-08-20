@@ -6,30 +6,28 @@ from spindl.spooler.query_engine import QueryEngine
 
 
 class TestQueryEngineList:
-    def test_list_spools(self, spooler_with_data):
+    async def test_list_spools(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.list_spools()
         assert result["total_spools"] >= 1
-        assert any(
-            s["spool_id"] == spool_id for s in result["spools"]
-        )
+        assert any(s["spool_id"] == spool_id for s in result["spools"])
 
-    def test_list_empty(self, spooler):
+    async def test_list_empty(self, spooler):
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.list_spools()
         assert result["total_spools"] == 0
 
 
 class TestQueryEngineQuery:
-    def test_basic_query(self, spooler_with_data):
+    async def test_basic_query(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.query(spool_id=spool_id)
         assert "results" in result
         assert result["pagination"]["total_records"] == 50
 
-    def test_filter(self, spooler_with_data):
+    async def test_filter(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.query(
@@ -46,7 +44,7 @@ class TestQueryEngineQuery:
         for row in result["results"]:
             assert row["severity"] == "critical"
 
-    def test_sort(self, spooler_with_data):
+    async def test_sort(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.query(
@@ -58,34 +56,28 @@ class TestQueryEngineQuery:
         scores = [r["cvss_score"] for r in result["results"]]
         assert scores == sorted(scores, reverse=True)
 
-    def test_pagination(self, spooler_with_data):
+    async def test_pagination(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
-        result = engine.query(
-            spool_id=spool_id, page=2, page_size=5
-        )
+        result = engine.query(spool_id=spool_id, page=2, page_size=5)
         assert result["pagination"]["page"] == 2
         assert result["pagination"]["has_previous"] is True
         assert len(result["results"]) == 5
 
-    def test_columns(self, spooler_with_data):
+    async def test_columns(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
-        result = engine.query(
-            spool_id=spool_id, columns=["cve_id", "severity"]
-        )
+        result = engine.query(spool_id=spool_id, columns=["cve_id", "severity"])
         for row in result["results"]:
             assert set(row.keys()) == {"cve_id", "severity"}
 
-    def test_search(self, spooler_with_data):
+    async def test_search(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
-        result = engine.query(
-            spool_id=spool_id, search="CVE-2024-1010"
-        )
+        result = engine.query(spool_id=spool_id, search="CVE-2024-1010")
         assert result["pagination"]["total_records"] >= 1
 
-    def test_invalid_spool(self, spooler_with_data):
+    async def test_invalid_spool(self, spooler_with_data):
         spooler, _ = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.query(spool_id="nonexistent")
@@ -93,21 +85,19 @@ class TestQueryEngineQuery:
 
 
 class TestQueryEngineAggregate:
-    def test_count_by_severity(self, spooler_with_data):
+    async def test_count_by_severity(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.aggregate(
             spool_id=spool_id,
             group_by=["severity"],
-            aggregates=[
-                {"function": "count", "column": "*", "alias": "total"}
-            ],
+            aggregates=[{"function": "count", "column": "*", "alias": "total"}],
         )
         assert result["total_groups"] == 4
         total = sum(r["total"] for r in result["results"])
         assert total == 50
 
-    def test_avg_score(self, spooler_with_data):
+    async def test_avg_score(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.aggregate(
@@ -123,7 +113,7 @@ class TestQueryEngineAggregate:
         assert len(result["results"]) == 1
         assert abs(result["results"][0]["avg_score"] - 6.15) < 0.01
 
-    def test_countdistinct(self, spooler_with_data):
+    async def test_countdistinct(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.aggregate(
@@ -138,7 +128,7 @@ class TestQueryEngineAggregate:
         )
         assert result["results"][0]["unique"] == 4
 
-    def test_countdistinct_star_rejected(self, spooler_with_data):
+    async def test_countdistinct_star_rejected(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.aggregate(
@@ -153,15 +143,13 @@ class TestQueryEngineAggregate:
         )
         assert "error" in result
 
-    def test_pagination(self, spooler_with_data):
+    async def test_pagination(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.aggregate(
             spool_id=spool_id,
             group_by=["severity"],
-            aggregates=[
-                {"function": "count", "column": "*", "alias": "total"}
-            ],
+            aggregates=[{"function": "count", "column": "*", "alias": "total"}],
             page=1,
             page_size=2,
         )
@@ -172,25 +160,21 @@ class TestQueryEngineAggregate:
 
 
 class TestQueryEngineDistinct:
-    def test_distinct_severity(self, spooler_with_data):
+    async def test_distinct_severity(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
-        result = engine.get_distinct_values(
-            spool_id=spool_id, column="severity"
-        )
+        result = engine.get_distinct_values(spool_id=spool_id, column="severity")
         assert result["total_distinct"] == 4
         values = {v["value"] for v in result["distinct_values"]}
         assert values == {"critical", "high", "medium", "low"}
 
-    def test_invalid_column(self, spooler_with_data):
+    async def test_invalid_column(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
-        result = engine.get_distinct_values(
-            spool_id=spool_id, column="nonexistent"
-        )
+        result = engine.get_distinct_values(spool_id=spool_id, column="nonexistent")
         assert "error" in result
 
-    def test_high_limit(self, spooler_with_data):
+    async def test_high_limit(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         engine = QueryEngine(spooler.get_connection(), spooler.config)
         result = engine.get_distinct_values(

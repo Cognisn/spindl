@@ -24,13 +24,13 @@ class InMemoryBackend:
         self.spools: dict[str, dict[str, Any]] = {}
         self.initialised = False
 
-    def initialise(self) -> None:
+    async def initialise(self) -> None:
         self.initialised = True
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         self.initialised = False
 
-    def create_spool(
+    async def create_spool(
         self,
         *,
         spool_id: str,
@@ -62,28 +62,30 @@ class InMemoryBackend:
             "sample": records[:3],
         }
 
-    def list_spools(self, *, scope: Optional[str] = None) -> dict:
+    async def list_spools(self, *, scope: Optional[str] = None) -> dict:
         spools = [
             {"spool_id": sid, "total_records": len(s["records"])}
             for sid, s in self.spools.items()
         ]
         return {"total_spools": len(spools), "spools": spools}
 
-    def query(self, spool_id: str, *, scope: Optional[str] = None, **kw: Any) -> dict:
+    async def query(
+        self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
+    ) -> dict:
         spool = self.spools[spool_id]
         return {"spool_id": spool_id, "records": spool["records"], "memory": True}
 
-    def aggregate(
+    async def aggregate(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
     ) -> dict:
         return {"spool_id": spool_id, "groups": []}
 
-    def distinct(
+    async def distinct(
         self, spool_id: str, column: str, *, scope: Optional[str] = None, **kw: Any
     ) -> dict:
         return {"values": sorted({r[column] for r in self.spools[spool_id]["records"]})}
 
-    def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
+    async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         return self.spools.pop(spool_id, None) is not None
 
 
@@ -96,11 +98,26 @@ def sqlite_config(tmp_path):
     )
 
 
-def spool(spooler: ResponseSpooler, **kwargs) -> str:
-    result = spooler.process_response(
+async def spool(spooler: ResponseSpooler, **kwargs) -> str:
+    result = await spooler.process_response(
         {"devices": ROWS}, source_tool="get_devices", array_paths=["devices"], **kwargs
     )
     return result["spooled_data"][0]["spool_id"]
+
+
+class TestSyncConveniences:
+    def test_sync_initialise_with_async_backend_outside_loop(self):
+        backend = InMemoryBackend()
+        spooler = ResponseSpooler(SpoolerConfig(backend=backend))
+        spooler.initialise()
+        assert backend.initialised
+        spooler.cleanup()
+        assert not backend.initialised
+
+    async def test_sync_initialise_with_async_backend_inside_loop_raises(self):
+        spooler = ResponseSpooler(SpoolerConfig(backend=InMemoryBackend()))
+        with pytest.raises(RuntimeError, match="initialise_async"):
+            spooler.initialise()
 
 
 class TestDefaultBackend:
@@ -113,20 +130,20 @@ class TestDefaultBackend:
 
 
 class TestInjectedBackend:
-    def test_spooler_initialises_and_writes_to_injected_backend(self):
+    async def test_spooler_initialises_and_writes_to_injected_backend(self):
         backend = InMemoryBackend()
         spooler = ResponseSpooler(SpoolerConfig(backend=backend, max_inline_items=5))
-        spooler.initialise()
+        await spooler.initialise_async()
         assert backend.initialised
-        spool_id = spool(spooler)
+        spool_id = await spool(spooler)
         assert spool_id in backend.spools
         assert len(backend.spools[spool_id]["records"]) == 30
 
     async def test_query_tool_delegates_to_injected_backend(self):
         backend = InMemoryBackend()
         spooler = ResponseSpooler(SpoolerConfig(backend=backend, max_inline_items=5))
-        spooler.initialise()
-        spool_id = spool(spooler)
+        await spooler.initialise_async()
+        spool_id = await spool(spooler)
         result = await SpoolerQueryTool(spooler=spooler).execute(spool_id=spool_id)
         assert result["memory"] is True
         assert len(result["records"]) == 30
@@ -134,32 +151,32 @@ class TestInjectedBackend:
     async def test_list_tool_delegates_to_injected_backend(self):
         backend = InMemoryBackend()
         spooler = ResponseSpooler(SpoolerConfig(backend=backend, max_inline_items=5))
-        spooler.initialise()
-        spool(spooler)
+        await spooler.initialise_async()
+        await spool(spooler)
         result = await SpoolerListSpoolsTool(spooler=spooler).execute()
         assert result["data"]["total_spools"] == 1
 
 
 class TestScope:
-    def test_scoped_spool_hidden_from_other_scope(self, sqlite_config):
+    async def test_scoped_spool_hidden_from_other_scope(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        spool_id = spool(spooler, scope="tenant-a")
+        spool_id = await spool(spooler, scope="tenant-a")
 
         backend = spooler.backend
-        assert backend.list_spools(scope="tenant-b")["total_spools"] == 0
-        assert backend.list_spools(scope="tenant-a")["total_spools"] == 1
-        assert "error" in backend.query(spool_id, scope="tenant-b")
-        assert "error" not in backend.query(spool_id, scope="tenant-a")
+        assert (await backend.list_spools(scope="tenant-b"))["total_spools"] == 0
+        assert (await backend.list_spools(scope="tenant-a"))["total_spools"] == 1
+        assert "error" in (await backend.query(spool_id, scope="tenant-b"))
+        assert "error" not in (await backend.query(spool_id, scope="tenant-a"))
 
-    def test_unscoped_read_sees_all_spools(self, sqlite_config):
+    async def test_unscoped_read_sees_all_spools(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        spool(spooler, scope="tenant-a")
-        spool(spooler)
-        assert spooler.backend.list_spools()["total_spools"] == 2
+        await spool(spooler, scope="tenant-a")
+        await spool(spooler)
+        assert (await spooler.backend.list_spools())["total_spools"] == 2
 
-    def test_scope_is_taken_from_authenticated_identity(self, sqlite_config):
+    async def test_scope_is_taken_from_authenticated_identity(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
         user = AuthenticatedUser(
@@ -167,43 +184,45 @@ class TestScope:
         )
         token = auth_context_var.set(user)
         try:
-            spool_id = spool(spooler)
+            spool_id = await spool(spooler)
             assert spooler.current_scope() == "user-9"
         finally:
             auth_context_var.reset(token)
-        assert "error" in spooler.backend.query(spool_id, scope="someone-else")
-        assert "error" not in spooler.backend.query(spool_id, scope="user-9")
+        assert "error" in (await spooler.backend.query(spool_id, scope="someone-else"))
+        assert "error" not in (await spooler.backend.query(spool_id, scope="user-9"))
 
 
 class TestExpiry:
-    def test_expired_spool_is_not_listed_or_queryable(self, sqlite_config):
+    async def test_expired_spool_is_not_listed_or_queryable(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        live = spool(spooler, ttl=3600)
-        dead = spool(spooler, ttl=-1)
-        listed = {s["spool_id"] for s in spooler.backend.list_spools()["spools"]}
+        live = await spool(spooler, ttl=3600)
+        dead = await spool(spooler, ttl=-1)
+        listed = {
+            s["spool_id"] for s in (await spooler.backend.list_spools())["spools"]
+        }
         assert live in listed
         assert dead not in listed
-        assert "error" in spooler.backend.query(dead)
+        assert "error" in (await spooler.backend.query(dead))
 
-    def test_default_ttl_from_config(self, tmp_path):
+    async def test_default_ttl_from_config(self, tmp_path):
         cfg = SpoolerConfig(
             db_path=str(tmp_path / "s.db"), max_inline_items=5, default_ttl_seconds=-1
         )
         spooler = ResponseSpooler(cfg)
         spooler.initialise()
-        spool_id = spool(spooler)
-        assert "error" in spooler.backend.query(spool_id)
+        spool_id = await spool(spooler)
+        assert "error" in (await spooler.backend.query(spool_id))
 
 
 class TestDelete:
-    def test_delete_spool_removes_registry_and_data(self, sqlite_config):
+    async def test_delete_spool_removes_registry_and_data(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        spool_id = spool(spooler)
-        assert spooler.backend.delete_spool(spool_id) is True
-        assert spooler.backend.delete_spool(spool_id) is False
-        assert spooler.backend.list_spools()["total_spools"] == 0
+        spool_id = await spool(spooler)
+        assert (await spooler.backend.delete_spool(spool_id)) is True
+        assert (await spooler.backend.delete_spool(spool_id)) is False
+        assert (await spooler.backend.list_spools())["total_spools"] == 0
         tables = {
             r[0]
             for r in spooler.get_connection().execute(
@@ -212,19 +231,19 @@ class TestDelete:
         }
         assert f"spool_{spool_id}" not in tables
 
-    def test_delete_respects_scope(self, sqlite_config):
+    async def test_delete_respects_scope(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        spool_id = spool(spooler, scope="tenant-a")
-        assert spooler.backend.delete_spool(spool_id, scope="tenant-b") is False
-        assert spooler.backend.delete_spool(spool_id, scope="tenant-a") is True
+        spool_id = await spool(spooler, scope="tenant-a")
+        assert (await spooler.backend.delete_spool(spool_id, scope="tenant-b")) is False
+        assert (await spooler.backend.delete_spool(spool_id, scope="tenant-a")) is True
 
 
 class TestEnvelopeUnchanged:
-    def test_summary_response_shape_is_preserved(self, sqlite_config):
+    async def test_summary_response_shape_is_preserved(self, sqlite_config):
         spooler = ResponseSpooler(sqlite_config)
         spooler.initialise()
-        result = spooler.process_response(
+        result = await spooler.process_response(
             {"devices": ROWS}, source_tool="get_devices", array_paths=["devices"]
         )
         entry = result["spooled_data"][0]

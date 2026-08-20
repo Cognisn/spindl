@@ -250,9 +250,12 @@ server = MCPServer(
 )
 ```
 
-A backend implements these synchronous methods. Every read takes an
-optional `scope`; `create_spool` returns the `stats` and `sample` used in the
-summary response:
+A backend implements these `async` methods. Tool dispatch runs on the MCP
+SDK's event loop, so a network backend must not block it: use a native async
+driver (for example asyncpg or psycopg in async mode) or wrap a blocking
+driver in `asyncio.to_thread`. The SQLite backend's methods are thin `async`
+wrappers over local calls. Every read takes an optional `scope`;
+`create_spool` returns the `stats` and `sample` used in the summary response:
 
 | Method | Purpose |
 | --- | --- |
@@ -265,7 +268,11 @@ summary response:
 | `delete_spool(spool_id, scope=)` | Remove a spool |
 
 Reads return `{"error": {"message": ..., "recoverable": bool}}` for an
-unknown, expired, or out-of-scope spool. The built-in tools and the summary
+unknown, expired, or out-of-scope spool. `ResponseSpooler.process_response`
+is a coroutine; `MCPServer` awaits it. When driving the spooler yourself with
+a non-SQLite backend inside an event loop, use `await spooler.initialise_async()`
+and `await spooler.cleanup_async()`; the synchronous `initialise()` and
+`cleanup()` remain for the SQLite backend and for code outside a loop. The built-in tools and the summary
 response shape (`spool_id`, `total_records`, `sample_records`, `query_hint`,
 `_spooler_meta.instructions`) do not change with the backend.
 
@@ -313,6 +320,6 @@ The database uses WAL journal mode and NORMAL synchronous for performance.
 ## Lifecycle
 
 1. **Initialise**: `await spooler.initialise()` -- creates SQLite file and schema
-2. **Process**: `spooler.process_response(response, source_tool, array_paths)` -- stores arrays
+2. **Process**: `await spooler.process_response(response, source_tool, array_paths)` -- stores arrays
 3. **Query**: `QueryEngine(connection, config).query(spool_id, ...)` -- reads data
 4. **Cleanup**: `await spooler.cleanup()` -- closes connection, optionally deletes file

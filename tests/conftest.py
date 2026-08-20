@@ -64,7 +64,7 @@ async def spooler(spooler_config):
 
 
 @pytest.fixture
-def spooler_with_data(spooler):
+async def spooler_with_data(spooler):
     """A spooler with 50 vulnerability records loaded."""
     vulns = [
         {
@@ -77,7 +77,7 @@ def spooler_with_data(spooler):
         }
         for i in range(50)
     ]
-    result = spooler.process_response(
+    result = await spooler.process_response(
         response={"scan_id": "test-scan-001", "vulnerabilities": vulns},
         source_tool="test_tool",
         array_paths=["vulnerabilities"],

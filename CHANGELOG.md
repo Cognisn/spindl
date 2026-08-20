@@ -27,6 +27,10 @@
 - The four spooler tools delegate to the configured backend instead of
   constructing a `QueryEngine` on the SQLite connection directly.
   `ResponseSpooler.get_connection()` is retained for the SQLite backend.
+- `SpoolBackend` methods are `async`, and `ResponseSpooler.process_response`
+  is now a coroutine so network backends never block the event loop. Callers
+  that used `process_response` directly must `await` it; `initialise_async()`
+  and `cleanup_async()` are added for use inside an event loop
 
 ### Fixed
 - The HTTP streamable transport now uses the SDK's `StreamableHTTPSessionManager`;

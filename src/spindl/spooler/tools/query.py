@@ -122,7 +122,7 @@ class SpoolerQueryTool(BaseTool):
             validated = self.InputModel(**params)
             self._spooler.require_initialised()
 
-            result = self._spooler.backend.query(
+            result = await self._spooler.backend.query(
                 spool_id=validated.spool_id,
                 scope=self._spooler.current_scope(),
                 columns=validated.columns,
