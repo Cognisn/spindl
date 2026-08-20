@@ -41,6 +41,10 @@ class AuthConfig:
         scopes_supported: Scopes advertised in the metadata document.
             Defaults to ``required_scopes``.
         resource_name: Optional human-readable name for the metadata.
+        serve_metadata: Register the RFC 9728 protected-resource metadata
+            routes on the transport application. Set False when a gateway
+            already serves the document at the origin; token verification
+            and the ``401``/``403`` challenges are unaffected.
     """
 
     token_verifier: TokenVerifier
@@ -49,6 +53,7 @@ class AuthConfig:
     required_scopes: list[str] = field(default_factory=list)
     scopes_supported: Optional[list[str]] = None
     resource_name: Optional[str] = None
+    serve_metadata: bool = True
 
     def __post_init__(self) -> None:
         if not self.authorization_servers:
@@ -76,40 +81,34 @@ def current_identity() -> Optional["AccessToken"]:
 
 
 def protect(app: Any, config: AuthConfig) -> Any:
-    """Wrap an ASGI endpoint so it requires a valid token with the scopes.
+    """Wrap an ASGI endpoint with the full bearer-token stack.
 
-    Unauthenticated requests receive ``401`` with a ``WWW-Authenticate``
-    challenge that points at the protected-resource metadata document;
-    authenticated requests lacking a required scope receive ``403``.
+    The returned callable authenticates the bearer token, publishes the
+    caller for :func:`current_identity`, and then requires a valid token
+    with the configured scopes. Unauthenticated requests receive ``401``
+    with a ``WWW-Authenticate`` challenge that points at the
+    protected-resource metadata document; authenticated requests lacking a
+    required scope receive ``403``. Because the stack is self-contained,
+    the endpoint can be registered directly on another application's
+    router without app-level middleware.
     """
-    from mcp.server.auth.middleware.bearer_auth import RequireAuthMiddleware
+    from mcp.server.auth.middleware.auth_context import AuthContextMiddleware
+    from mcp.server.auth.middleware.bearer_auth import (
+        BearerAuthBackend,
+        RequireAuthMiddleware,
+    )
     from pydantic import AnyHttpUrl
+    from starlette.middleware.authentication import AuthenticationMiddleware
 
-    return RequireAuthMiddleware(
+    guarded = RequireAuthMiddleware(
         app,
         required_scopes=list(config.required_scopes),
         resource_metadata_url=AnyHttpUrl(_metadata_url(config)),
     )
-
-
-def middleware(config: AuthConfig) -> list[Any]:
-    """Starlette middleware that authenticates bearer tokens.
-
-    The authentication middleware populates ``scope["user"]`` and the
-    context middleware publishes it for :func:`current_identity`.
-    """
-    from mcp.server.auth.middleware.auth_context import AuthContextMiddleware
-    from mcp.server.auth.middleware.bearer_auth import BearerAuthBackend
-    from starlette.middleware import Middleware
-    from starlette.middleware.authentication import AuthenticationMiddleware
-
-    return [
-        Middleware(
-            AuthenticationMiddleware,
-            backend=BearerAuthBackend(config.token_verifier),
-        ),
-        Middleware(AuthContextMiddleware),
-    ]
+    return AuthenticationMiddleware(
+        AuthContextMiddleware(guarded),
+        backend=BearerAuthBackend(config.token_verifier),
+    )
 
 
 def metadata_routes(config: AuthConfig) -> list[Any]:

@@ -174,9 +174,58 @@ otherwise.
 ### Building the ASGI app yourself
 
 `server.build_http_app()` and `server.build_sse_app()` return the Starlette
-application that `run_http()` and `run_sse()` serve, which is useful for
-mounting Spindl inside a larger ASGI application or for testing with an ASGI
-client. The HTTP application has a lifespan that must be running.
+application that `run_http()` and `run_sse()` serve. The HTTP application has
+a lifespan that must be running.
+
+### Mounting behind an existing gateway
+
+If another Starlette or FastAPI application already owns the origin (TLS, the
+authorisation server, discovery documents), Spindl can live inside it. There
+are two ways, and the first is preferred when the external URL must be exact.
+
+**Register the endpoint on your own router.** `http_endpoint()` returns the
+transport as a raw ASGI callable that carries its own bearer-token stack when
+`auth` is set, and `http_lifespan` runs the session manager:
+
+```python
+from starlette.applications import Starlette
+from starlette.routing import Route
+
+endpoint = await server.http_endpoint()
+gateway = Starlette(
+    routes=[
+        Route("/mcp", endpoint, methods=["POST", "GET", "DELETE"]),
+        # ... the gateway's own routes
+    ],
+    lifespan=server.http_lifespan,   # or nest it inside your own lifespan
+)
+```
+
+The external URL is exactly `/mcp`, with no redirect.
+
+**Mount the app under a prefix.** Serve at the sub-application root and mount:
+
+```python
+app = await server.build_http_app(path="/")
+gateway.mount("/mcp", app)
+```
+
+Note that Starlette answers a mounted sub-application at `/mcp/` and sends a
+`307` for a bare `/mcp`. The `mcp` SDK client follows redirects, so it works;
+other clients may not. For SSE, `build_sse_app(sse_path=..., messages_path=...)`
+accepts the same treatment, and the messages URL advertised to clients is
+automatically prefixed with the mount path.
+
+**Let the gateway serve discovery.** When the gateway already publishes the
+RFC 9728 protected-resource document at the origin, stop Spindl registering
+its own copy while keeping token verification and the `401`/`403` challenges:
+
+```python
+auth = AuthConfig(..., serve_metadata=False)
+```
+
+The `401` challenge's `resource_metadata` URL derives from
+`resource_server_url`, so it keeps pointing at the document the gateway serves.
 
 ## Choosing a Transport
 

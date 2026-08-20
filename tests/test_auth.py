@@ -209,3 +209,104 @@ class TestAuthConfig:
                 resource_server_url=RESOURCE_URL,
                 authorization_servers=[],
             )
+
+
+class TestMountableTransports:
+    async def test_http_path_is_configurable(self):
+        server = MCPServer(prefix="test")
+        app = await server.build_http_app(path="/")
+        async with running_app(app) as (client, _):
+            at_root = await client.post("/", json=INIT_BODY, headers=MCP_HEADERS)
+            at_mcp = await client.post("/mcp", json=INIT_BODY, headers=MCP_HEADERS)
+        assert at_root.status_code == 200
+        assert at_mcp.status_code == 404
+
+    async def test_http_endpoint_mounts_exactly_on_gateway_route(self):
+        from starlette.applications import Starlette
+        from starlette.responses import PlainTextResponse
+        from starlette.routing import Route
+
+        server = MCPServer(prefix="test", auth=make_auth())
+        server.register(WhoAmITool())
+        endpoint = await server.http_endpoint()
+
+        async def other(request):
+            return PlainTextResponse("gateway")
+
+        gateway = Starlette(
+            routes=[
+                Route("/other", other),
+                Route("/mcp", endpoint, methods=["POST", "GET", "DELETE"]),
+            ],
+            lifespan=server.http_lifespan,
+        )
+        async with running_app(gateway) as (client, transport):
+            sibling = await client.get("/other")
+            anonymous = await client.post("/mcp", json=INIT_BODY, headers=MCP_HEADERS)
+            http_client = httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                headers={"Authorization": "Bearer good-token"},
+            )
+            async with streamable_http_client(
+                RESOURCE_URL, http_client=http_client
+            ) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    result = await session.call_tool("test_whoami", {})
+        assert sibling.text == "gateway"
+        assert anonymous.status_code == 401
+        assert json.loads(result.content[0].text)["subject"] == "user-1"
+
+    async def test_serve_metadata_false_suppresses_well_known_but_keeps_challenge(self):
+        cfg = make_auth()
+        cfg.serve_metadata = False
+        server = MCPServer(prefix="test", auth=cfg)
+        app = await server.build_http_app()
+        async with running_app(app) as (client, _):
+            metadata = await client.get("/.well-known/oauth-protected-resource/mcp")
+            anonymous = await client.post("/mcp", json=INIT_BODY, headers=MCP_HEADERS)
+        assert metadata.status_code == 404
+        assert anonymous.status_code == 401
+        assert (
+            "/.well-known/oauth-protected-resource/mcp"
+            in anonymous.headers["www-authenticate"]
+        )
+
+    async def test_sse_paths_are_configurable_and_mount_under_prefix(self):
+        # ASGITransport buffers whole responses, so an open SSE stream never
+        # returns through it; serve through uvicorn on a free port instead.
+        import asyncio
+        import socket
+
+        import uvicorn
+        from starlette.applications import Starlette
+        from starlette.routing import Mount
+
+        server = MCPServer(prefix="test")
+        app = await server.build_sse_app(sse_path="/events", messages_path="/post/")
+        gateway = Starlette(routes=[Mount("/api", app=app)])
+
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        config = uvicorn.Config(gateway, host="127.0.0.1", port=port, log_level="error")
+        uv = uvicorn.Server(config)
+        task = asyncio.create_task(uv.serve())
+        try:
+            while not uv.started:
+                await asyncio.sleep(0.02)
+            first = ""
+            async with httpx.AsyncClient(timeout=5) as client:
+                async with client.stream(
+                    "GET", f"http://127.0.0.1:{port}/api/events"
+                ) as resp:
+                    assert resp.status_code == 200
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data:"):
+                            first = line
+                            break
+        finally:
+            uv.should_exit = True
+            await task
+        assert "/api/post/?session_id=" in first

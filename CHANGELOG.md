@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+- `MCPServer.http_endpoint()` and `http_lifespan` so the HTTP transport can be
+  registered as a route on an existing Starlette or FastAPI gateway at an exact
+  path; the endpoint carries its own bearer-token stack when `auth` is set (#9)
+- `build_http_app(path=...)` and `build_sse_app(sse_path=..., messages_path=...)`
+  to serve at the sub-application root for mounting under a prefix (#9)
+- `AuthConfig(serve_metadata=False)` to suppress Spindl's RFC 9728 metadata
+  routes when a gateway already serves discovery at the origin (#9)
+
 ## [0.2.0a2] - 2026-08-20
 
 ### Changed

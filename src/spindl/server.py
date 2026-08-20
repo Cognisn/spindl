@@ -7,6 +7,8 @@ ResponseSpooler. Supports stdio, HTTP streamable, and SSE transports.
 
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from spindl.auth import AuthConfig
@@ -58,6 +60,7 @@ class MCPServer:
         self._spooler: Optional[ResponseSpooler] = None
         self._spooler_config = spooler
         self._mcp_server: Any = None
+        self._session_manager: Any = None
         self._setup_done = False
 
     def register(self, tool: BaseTool) -> None:
@@ -239,63 +242,93 @@ class MCPServer:
 
         await self._cleanup()
 
-    async def build_http_app(self) -> Any:
-        """Build the Starlette application for the HTTP streamable transport.
+    async def http_endpoint(self) -> Any:
+        """Return the HTTP streamable transport as a raw ASGI callable.
 
-        Serves ``POST /mcp`` (stateless, JSON responses). Reads the
+        Register it on your own router, for example
+        ``Route("/mcp", await server.http_endpoint(), methods=["POST", "GET",
+        "DELETE"])``, and run :meth:`http_lifespan` from your application's
+        lifespan. When ``auth`` is configured the callable carries its own
+        bearer-token stack, so no app-level middleware is needed. Reads the
         ``X-Spindl-Prefix`` header for per-request instance prefixing.
-        When ``auth`` is configured, the endpoint requires a bearer token
-        and the RFC 9728 protected-resource metadata document is served.
-        The application's lifespan must be running for requests to be
-        handled; ``run_http`` does this through uvicorn.
         """
         await self._setup()
-
-        from contextlib import asynccontextmanager
 
         from mcp.server.streamable_http_manager import (
             StreamableHTTPSessionManager,
         )
-        from starlette.applications import Starlette
-        from starlette.routing import Route
         from starlette.types import Receive, Scope, Send
 
-        session_manager = StreamableHTTPSessionManager(
-            app=self._mcp_server,
-            json_response=True,
-            stateless=True,
-        )
+        if self._session_manager is None:
+            self._session_manager = StreamableHTTPSessionManager(
+                app=self._mcp_server,
+                json_response=True,
+                stateless=True,
+            )
+        session_manager = self._session_manager
         prefix_resolver = self._prefix_resolver
 
         async def handle_mcp(scope: Scope, receive: Receive, send: Send) -> None:
             prefix_resolver.set_instance_prefix(_header(scope, "x-spindl-prefix"))
             await session_manager.handle_request(scope, receive, send)
 
-        @asynccontextmanager
-        async def lifespan(app: Any):  # type: ignore[no-untyped-def]
-            async with session_manager.run():
-                yield
-
-        routes: list[Any] = []
-        middleware: list[Any] = []
         endpoint: Any = _AsgiEndpoint(handle_mcp)
         if self._auth is not None:
             from spindl import auth as _auth
 
             endpoint = _auth.protect(handle_mcp, self._auth)
-            middleware = _auth.middleware(self._auth)
+        return endpoint
+
+    @asynccontextmanager
+    async def http_lifespan(self, app: Any = None) -> AsyncIterator[None]:
+        """Run the HTTP transport's session manager.
+
+        Usable directly as a Starlette ``lifespan`` (it accepts and ignores
+        the app argument) or nested inside your own lifespan. Requests to
+        the endpoint from :meth:`http_endpoint` are only handled while this
+        is running.
+        """
+        if self._session_manager is None:
+            await self.http_endpoint()
+        assert self._session_manager is not None
+        async with self._session_manager.run():
+            yield
+
+    async def build_http_app(self, path: str = "/mcp") -> Any:
+        """Build the Starlette application for the HTTP streamable transport.
+
+        Serves the endpoint at ``path`` (stateless, JSON responses). Pass
+        ``path="/"`` to serve at the application root so the app can be
+        mounted under an external prefix. When ``auth`` is configured the
+        endpoint requires a bearer token and, unless
+        ``AuthConfig.serve_metadata`` is False, the RFC 9728
+        protected-resource metadata document is served. The application's
+        lifespan must be running for requests to be handled; ``run_http``
+        does this through uvicorn.
+        """
+        from starlette.applications import Starlette
+        from starlette.routing import Route
+
+        endpoint = await self.http_endpoint()
+        routes: list[Any] = []
+        if self._auth is not None and self._auth.serve_metadata:
+            from spindl import auth as _auth
+
             routes.extend(_auth.metadata_routes(self._auth))
-        routes.append(
-            Route("/mcp", endpoint=endpoint, methods=["POST", "GET", "DELETE"])
-        )
+        routes.append(Route(path, endpoint=endpoint, methods=["POST", "GET", "DELETE"]))
+        return Starlette(routes=routes, lifespan=self.http_lifespan)
 
-        return Starlette(routes=routes, middleware=middleware, lifespan=lifespan)
-
-    async def build_sse_app(self) -> Any:
+    async def build_sse_app(
+        self, sse_path: str = "/sse", messages_path: str = "/messages/"
+    ) -> Any:
         """Build the Starlette application for the SSE transport.
 
-        Serves ``GET /sse`` and ``POST /messages/``. When ``auth`` is
-        configured, both require a bearer token.
+        Serves ``GET sse_path`` and ``POST messages_path``. When mounted
+        under a prefix, the SDK transport prefixes the messages URL it
+        advertises to clients with the mount path. When ``auth`` is
+        configured both endpoints require a bearer token and, unless
+        ``AuthConfig.serve_metadata`` is False, the metadata document is
+        served.
         """
         await self._setup()
 
@@ -304,7 +337,7 @@ class MCPServer:
         from starlette.routing import Route
         from starlette.types import Receive, Scope, Send
 
-        sse_transport = SseServerTransport("/messages/")
+        sse_transport = SseServerTransport(messages_path)
         mcp_server = self._mcp_server
         prefix_resolver = self._prefix_resolver
 
@@ -321,7 +354,6 @@ class MCPServer:
             await sse_transport.handle_post_message(scope, receive, send)
 
         routes: list[Any] = []
-        middleware: list[Any] = []
         sse_endpoint: Any = _AsgiEndpoint(handle_sse)
         messages_endpoint: Any = _AsgiEndpoint(handle_messages)
         if self._auth is not None:
@@ -329,12 +361,14 @@ class MCPServer:
 
             sse_endpoint = _auth.protect(handle_sse, self._auth)
             messages_endpoint = _auth.protect(handle_messages, self._auth)
-            middleware = _auth.middleware(self._auth)
-            routes.extend(_auth.metadata_routes(self._auth))
-        routes.append(Route("/sse", endpoint=sse_endpoint, methods=["GET"]))
-        routes.append(Route("/messages/", endpoint=messages_endpoint, methods=["POST"]))
+            if self._auth.serve_metadata:
+                routes.extend(_auth.metadata_routes(self._auth))
+        routes.append(Route(sse_path, endpoint=sse_endpoint, methods=["GET"]))
+        routes.append(
+            Route(messages_path, endpoint=messages_endpoint, methods=["POST"])
+        )
 
-        return Starlette(routes=routes, middleware=middleware)
+        return Starlette(routes=routes)
 
     async def run_http(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Run the server on HTTP streamable transport.
