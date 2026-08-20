@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- Pinned `mcp<2.0.0`: the 2.0 SDK removed the low-level `Server.list_tools` and
+  `call_tool` decorators that `MCPServer` relies on, breaking server start-up
+
 ### Added
 - Sample MCP server (`sample/`) demonstrating framework usage with two tools:
   - `get_devices` -- inventory tool with `spooler_auto_detect`
