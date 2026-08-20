@@ -1,13 +1,21 @@
 """Tests for spooler tools."""
 
-from unittest.mock import MagicMock
-
 import pytest
 
+from spindl.spooler.config import SpoolerConfig
+from spindl.spooler.spooler import ResponseSpooler
 from spindl.spooler.tools.aggregate import SpoolerAggregateTool
 from spindl.spooler.tools.distinct import SpoolerDistinctTool
 from spindl.spooler.tools.list_spools import SpoolerListSpoolsTool
 from spindl.spooler.tools.query import SpoolerQueryTool
+
+
+class InMemoryBackend:
+    """Stand-in backend; the spooler is never initialised in these tests."""
+
+    def initialise(self) -> None: ...
+
+    def cleanup(self) -> None: ...
 
 
 class TestSpoolerToolMetadata:
@@ -70,8 +78,7 @@ class TestSpoolerListSpools:
 
     @pytest.mark.asyncio
     async def test_unavailable(self):
-        mock = MagicMock()
-        mock.get_connection.side_effect = RuntimeError("not init")
+        mock = ResponseSpooler(SpoolerConfig(backend=InMemoryBackend()))
         tool = SpoolerListSpoolsTool(spooler=mock)
         result = await tool.execute()
         assert result["success"] is False
@@ -113,8 +120,7 @@ class TestSpoolerQuery:
 
     @pytest.mark.asyncio
     async def test_unavailable(self):
-        mock = MagicMock()
-        mock.get_connection.side_effect = RuntimeError("not init")
+        mock = ResponseSpooler(SpoolerConfig(backend=InMemoryBackend()))
         tool = SpoolerQueryTool(spooler=mock)
         result = await tool.execute(spool_id="any")
         assert result["success"] is False
@@ -129,9 +135,7 @@ class TestSpoolerAggregate:
         result = await tool.execute(
             spool_id=spool_id,
             group_by=["severity"],
-            aggregates=[
-                {"function": "count", "column": "*", "alias": "total"}
-            ],
+            aggregates=[{"function": "count", "column": "*", "alias": "total"}],
         )
         assert result["total_groups"] == 4
 
@@ -145,8 +149,7 @@ class TestSpoolerAggregate:
 
     @pytest.mark.asyncio
     async def test_unavailable(self):
-        mock = MagicMock()
-        mock.get_connection.side_effect = RuntimeError("not init")
+        mock = ResponseSpooler(SpoolerConfig(backend=InMemoryBackend()))
         tool = SpoolerAggregateTool(spooler=mock)
         result = await tool.execute(spool_id="any")
         assert result["success"] is False
@@ -158,28 +161,21 @@ class TestSpoolerDistinct:
     async def test_distinct(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         tool = SpoolerDistinctTool(spooler=spooler)
-        result = await tool.execute(
-            spool_id=spool_id, column="severity"
-        )
+        result = await tool.execute(spool_id=spool_id, column="severity")
         assert result["total_distinct"] == 4
 
     @pytest.mark.asyncio
     async def test_invalid_column(self, spooler_with_data):
         spooler, spool_id = spooler_with_data
         tool = SpoolerDistinctTool(spooler=spooler)
-        result = await tool.execute(
-            spool_id=spool_id, column="nonexistent"
-        )
+        result = await tool.execute(spool_id=spool_id, column="nonexistent")
         assert result["success"] is False
         assert result["error"]["error_code"] == "DISTINCT_ERROR"
 
     @pytest.mark.asyncio
     async def test_unavailable(self):
-        mock = MagicMock()
-        mock.get_connection.side_effect = RuntimeError("not init")
+        mock = ResponseSpooler(SpoolerConfig(backend=InMemoryBackend()))
         tool = SpoolerDistinctTool(spooler=mock)
-        result = await tool.execute(
-            spool_id="any", column="severity"
-        )
+        result = await tool.execute(spool_id="any", column="severity")
         assert result["success"] is False
         assert result["error"]["error_code"] == "SPOOLER_UNAVAILABLE"

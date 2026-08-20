@@ -5,7 +5,6 @@ from typing import Any
 
 from spindl.responses import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -56,11 +55,10 @@ class SpoolerListSpoolsTool(BaseTool):
 
     async def execute(self, **params: Any) -> dict:
         try:
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
+            self._spooler.require_initialised()
+            result = self._spooler.backend.list_spools(
+                scope=self._spooler.current_scope()
             )
-            result = engine.list_spools()
 
             return ResponseEnvelope(
                 success=True,

@@ -6,7 +6,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -124,13 +123,11 @@ class SpoolerAggregateTool(BaseTool):
     async def execute(self, **params: Any) -> dict:
         try:
             validated = self.InputModel(**params)
+            self._spooler.require_initialised()
 
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
-            )
-            result = engine.aggregate(
+            result = self._spooler.backend.aggregate(
                 spool_id=validated.spool_id,
+                scope=self._spooler.current_scope(),
                 group_by=validated.group_by,
                 aggregates=validated.aggregates,
                 filters=validated.filters,
