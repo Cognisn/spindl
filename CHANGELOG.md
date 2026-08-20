@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0a3] - 2026-08-20
+
 ### Added
 - `MCPServer.http_endpoint()` and `http_lifespan` so the HTTP transport can be
   registered as a route on an existing Starlette or FastAPI gateway at an exact
