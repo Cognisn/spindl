@@ -258,7 +258,7 @@ class QueryEngine:
 
         if not self._is_valid_column(column, valid_columns):
             return self._error(
-                f"Invalid column '{column}'. " f"Valid columns: {valid_columns}"
+                f"Invalid column '{column}'. Valid columns: {valid_columns}"
             )
 
         limit = min(max(1, limit), 500)
@@ -535,7 +535,7 @@ class QueryEngine:
                 if not isinstance(value, list) or len(value) == 0:
                     return (
                         self._error(
-                            "The 'in' operator requires a non-empty " "list value."
+                            "The 'in' operator requires a non-empty list value."
                         ),
                         [],
                     )

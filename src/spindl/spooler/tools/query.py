@@ -168,7 +168,7 @@ class SpoolerQueryTool(BaseTool):
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error("Unexpected error in spooler_query: %s", exc)
+            logger.exception("Unexpected error in spooler_query: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

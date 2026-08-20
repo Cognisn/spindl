@@ -63,11 +63,15 @@ class ToolRegistry:
         """
         from mcp.types import Tool
 
+        # Validate through the wire alias: the field is ``inputSchema`` on
+        # mcp 1.x and ``input_schema`` (alias ``inputSchema``) on 2.x.
         return [
-            Tool(
-                name=self._prefix_resolver.prefixed_name(tool.name),
-                description=tool.description,
-                inputSchema=tool.input_schema,
+            Tool.model_validate(
+                {
+                    "name": self._prefix_resolver.prefixed_name(tool.name),
+                    "description": tool.description,
+                    "inputSchema": tool.input_schema,
+                }
             )
             for tool in self._tools.values()
         ]

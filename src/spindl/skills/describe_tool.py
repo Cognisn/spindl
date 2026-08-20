@@ -26,7 +26,7 @@ class DescribeToolTool(BaseTool):
     class InputModel(BaseModel):
         tool_name: str = Field(
             description=(
-                "The full name of the tool to describe " "(as shown by list_tools)"
+                "The full name of the tool to describe (as shown by list_tools)"
             ),
         )
 
@@ -56,7 +56,7 @@ class DescribeToolTool(BaseTool):
                     error=ErrorDetail(
                         error_code="TOOL_NOT_FOUND",
                         error_message=(
-                            f"No tool found with name " f"'{validated.tool_name}'"
+                            f"No tool found with name '{validated.tool_name}'"
                         ),
                         retry_eligible=False,
                         suggestion=(

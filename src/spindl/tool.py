@@ -49,7 +49,7 @@ class BaseTool:
     category: str = ""
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
-    InputModel: type[BaseModel] | None = (
+    InputModel: type[BaseModel] | None = (  # NOSONAR(python:S116) public API name
         None  # NOSONAR - PascalCase is correct for a class type
     )
 
@@ -88,7 +88,7 @@ class BaseTool:
                 if not field_info.is_required() and field_info.default is not None:
                     default_str = f" (default: {field_info.default})"
                 lines.append(
-                    f"- **{field_name}** ({required}): " f"{field_desc}{default_str}"
+                    f"- **{field_name}** ({required}): {field_desc}{default_str}"
                 )
             lines.append("")
         else:

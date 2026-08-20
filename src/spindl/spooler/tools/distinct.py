@@ -16,7 +16,7 @@ class SpoolerDistinctTool(BaseTool):
 
     name = "spooler_distinct"
     description = (
-        "Get distinct values and frequency counts for a column " "in spooled data"
+        "Get distinct values and frequency counts for a column in spooled data"
     )
     category = "spooler"
 
@@ -107,7 +107,7 @@ class SpoolerDistinctTool(BaseTool):
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error("Unexpected error in spooler_distinct: %s", exc)
+            logger.exception("Unexpected error in spooler_distinct: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",
