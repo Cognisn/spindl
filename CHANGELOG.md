@@ -8,6 +8,12 @@
 - Python 3.10 and 3.11 support; `requires-python` lowered to `>=3.10` and the
   CI matrix now covers 3.10 to 3.13 against both `mcp` series (#10, #11)
 
+### Fixed
+- Spool IDs now include random bytes as well as the timestamp. On platforms
+  with coarse clock resolution (Windows, about 15 ms) two spools created in
+  quick succession from the same tool and path could share an ID, and the
+  second silently replaced the first
+
 ### Changed
 - `httpx` and `pytest-timeout` added to the `dev` extra (`mcp` 2.x no longer
   depends on `httpx`)

@@ -12,6 +12,7 @@ import copy
 import hashlib
 import json
 import logging
+import secrets
 import sqlite3
 import time
 from typing import Any, Optional
@@ -441,9 +442,15 @@ class ResponseSpooler:
         }
 
     def _generate_spool_id(self, source_tool: str, array_path: str) -> str:
-        """Generate a short, unique spool ID."""
+        """Generate a short, unique spool ID.
+
+        Mixes in random bytes as well as the clock: ``time.time_ns()`` has
+        coarse resolution on some platforms (about 15 ms on Windows), so
+        two spools created in quick succession from the same tool and path
+        would otherwise collide and the second would overwrite the first.
+        """
         timestamp = str(time.time_ns())
-        raw = f"{source_tool}:{array_path}:{timestamp}"
+        raw = f"{source_tool}:{array_path}:{timestamp}:{secrets.token_hex(8)}"
         return hashlib.sha256(raw.encode()).hexdigest()[:12]
 
     def cleanup(self) -> None:
