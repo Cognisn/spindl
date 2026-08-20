@@ -1,7 +1,8 @@
 """Core Response Spooler.
 
 Handles the ingestion of raw API JSON responses, detection and extraction
-of array data, storage in SQLite, and generation of LLM-friendly summaries.
+of array data, storage through a SpoolBackend (SQLite by default), and
+generation of LLM-friendly summaries.
 
 Guidance text uses @placeholder syntax for tool name references, which
 are resolved by the PrefixResolver at the server level.
@@ -13,10 +14,9 @@ import json
 import logging
 import sqlite3
 import time
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
 
+from spindl.spooler.backend import SpoolBackend, SQLiteSpoolBackend
 from spindl.spooler.config import SpoolerConfig
 
 logger = logging.getLogger(__name__)
@@ -46,50 +46,38 @@ class ResponseSpooler:
     def __init__(self, config: Optional[SpoolerConfig] = None) -> None:
         self.config = config or SpoolerConfig()
         self.config.validate()
-        self._db: Optional[sqlite3.Connection] = None
+        self.backend: SpoolBackend = self.config.backend or SQLiteSpoolBackend(
+            self.config
+        )
         self._initialised = False
 
     def initialise(self) -> None:
-        """Initialise the SQLite database and create schema tables."""
+        """Initialise the storage backend."""
         if self._initialised:
             return
-
-        self._db = sqlite3.connect(self.config.db_path)
-        self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("PRAGMA synchronous=NORMAL")
-
-        self._create_schema()
+        self.backend.initialise()
         self._initialised = True
-        logger.info(
-            "Response spooler initialised with database at %s",
-            self.config.db_path,
-        )
 
-    def _create_schema(self) -> None:
-        """Create the metadata and registry tables."""
-        self._db.executescript("""
-            CREATE TABLE IF NOT EXISTS _spool_registry (
-                spool_id TEXT PRIMARY KEY,
-                source_tool TEXT NOT NULL,
-                array_path TEXT NOT NULL,
-                table_name TEXT NOT NULL,
-                total_records INTEGER NOT NULL,
-                column_names TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                description TEXT
-            );
+    def require_initialised(self) -> None:
+        """Raise RuntimeError unless ``initialise()`` has been called."""
+        if not self._initialised:
+            raise RuntimeError("Spooler not initialised.")
 
-            CREATE TABLE IF NOT EXISTS _spool_stats (
-                spool_id TEXT PRIMARY KEY,
-                numeric_columns TEXT,
-                min_values TEXT,
-                max_values TEXT,
-                distinct_counts TEXT,
-                FOREIGN KEY (spool_id) REFERENCES _spool_registry(spool_id)
-            );
-        """)
-        self._db.commit()
+    def current_scope(self) -> Optional[str]:
+        """Scope applied to spools created or read in this request.
+
+        Returns the authenticated caller's subject (or client id) when
+        ``scope_from_identity`` is set and a request is authenticated,
+        otherwise ``None``.
+        """
+        if not self.config.scope_from_identity:
+            return None
+        from spindl.auth import current_identity
+
+        identity = current_identity()
+        if identity is None:
+            return None
+        return identity.subject or identity.client_id
 
     def process_response(
         self,
@@ -97,8 +85,10 @@ class ResponseSpooler:
         source_tool: str,
         array_paths: Optional[list[str]] = None,
         description: Optional[str] = None,
+        scope: Optional[str] = None,
+        ttl: Optional[int] = None,
     ) -> dict:
-        """Process an API response, spooling large arrays to SQLite.
+        """Process an API response, spooling large arrays to the backend.
 
         Args:
             response: The raw API response as a parsed dict or list.
@@ -106,6 +96,10 @@ class ResponseSpooler:
             array_paths: Optional list of dot-notation paths to arrays.
                 If None, the spooler will auto-detect top-level arrays.
             description: Optional human-readable description of the data.
+            scope: Owner of the resulting spools. Defaults to
+                ``current_scope()``.
+            ttl: Lifetime in seconds. Defaults to
+                ``config.default_ttl_seconds``.
 
         Returns:
             A dict containing either the original response (if small
@@ -130,6 +124,11 @@ class ResponseSpooler:
         if not array_paths:
             return self._size_guard(response)
 
+        if scope is None:
+            scope = self.current_scope()
+        if ttl is None:
+            ttl = self.config.default_ttl_seconds
+
         # Process each array path
         spooled_arrays = []
         remaining_response = self._deep_copy_without_arrays(
@@ -139,7 +138,7 @@ class ResponseSpooler:
         for path in array_paths:
             spool_info = self._process_array_path(
                 response, remaining_response, path,
-                source_tool, description,
+                source_tool, description, scope, ttl,
             )
             if spool_info is not None:
                 spooled_arrays.append(spool_info)
@@ -160,6 +159,8 @@ class ResponseSpooler:
         path: str,
         source_tool: str,
         description: Optional[str],
+        scope: Optional[str] = None,
+        ttl: Optional[int] = None,
     ) -> Optional[dict]:
         """Process a single array path, returning spool info if spooled."""
         array_data = self._extract_path(response, path)
@@ -189,6 +190,8 @@ class ResponseSpooler:
             source_tool=source_tool,
             array_path=path,
             description=description,
+            scope=scope,
+            ttl=ttl,
         )
 
     def _detect_arrays(
@@ -257,77 +260,35 @@ class ResponseSpooler:
         source_tool: str,
         array_path: str,
         description: Optional[str] = None,
+        scope: Optional[str] = None,
+        ttl: Optional[int] = None,
     ) -> dict:
-        """Store an array of objects in a dynamically created SQLite table."""
+        """Flatten an array and store it through the backend."""
         spool_id = self._generate_spool_id(source_tool, array_path)
-        table_name = f"spool_{spool_id}"
 
         columns, rows = self._flatten_array(array_data)
         col_types = self._infer_column_types(columns, rows)
 
-        col_defs = ", ".join(
-            f'"{col}" {col_types[col]}' for col in columns
+        stored = self.backend.create_spool(
+            spool_id=spool_id,
+            source_tool=source_tool,
+            array_path=array_path,
+            columns=columns,
+            column_types=col_types,
+            rows=rows,
+            description=description,
+            scope=scope,
+            ttl=ttl,
         )
-        self._db.execute(
-            f'CREATE TABLE IF NOT EXISTS "{table_name}" '
-            f"(_row_id INTEGER PRIMARY KEY AUTOINCREMENT, {col_defs})"
-        )
-
-        placeholders = ", ".join(["?"] * len(columns))
-        col_names = ", ".join(f'"{c}"' for c in columns)
-        self._db.executemany(
-            f'INSERT INTO "{table_name}" ({col_names}) '
-            f"VALUES ({placeholders})",
-            rows,
-        )
-
-        stats = self._compute_stats(table_name, columns, col_types)
-
-        now = datetime.now(timezone.utc).isoformat()
-        self._db.execute(
-            """INSERT OR REPLACE INTO _spool_registry
-               (spool_id, source_tool, array_path, table_name,
-                total_records, column_names, created_at, description)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                spool_id,
-                source_tool,
-                array_path,
-                table_name,
-                len(rows),
-                json.dumps(columns),
-                now,
-                description,
-            ),
-        )
-
-        self._db.execute(
-            """INSERT OR REPLACE INTO _spool_stats
-               (spool_id, numeric_columns, min_values,
-                max_values, distinct_counts)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
-                spool_id,
-                json.dumps(stats.get("numeric_columns", [])),
-                json.dumps(stats.get("min_values", {})),
-                json.dumps(stats.get("max_values", {})),
-                json.dumps(stats.get("distinct_counts", {})),
-            ),
-        )
-
-        self._db.commit()
-
-        sample = self._get_sample(table_name, columns)
 
         return {
             "spool_id": spool_id,
             "array_path": array_path,
-            "table_name": table_name,
             "total_records": len(rows),
             "columns": columns,
             "column_types": col_types,
-            "stats": stats,
-            "sample": sample,
+            "stats": stored["stats"],
+            "sample": stored["sample"],
         }
 
     def _flatten_array(
@@ -397,50 +358,6 @@ class ResponseSpooler:
                 types[col] = "TEXT"
 
         return types
-
-    def _compute_stats(
-        self,
-        table_name: str,
-        columns: list[str],
-        col_types: dict[str, str],
-    ) -> dict:
-        """Compute basic statistics on the spooled data."""
-        stats: dict[str, Any] = {
-            "numeric_columns": [],
-            "min_values": {},
-            "max_values": {},
-            "distinct_counts": {},
-        }
-
-        for col in columns:
-            cursor = self._db.execute(
-                f'SELECT COUNT(DISTINCT "{col}") FROM "{table_name}"'
-            )
-            stats["distinct_counts"][col] = cursor.fetchone()[0]
-
-            if col_types[col] in ("INTEGER", "REAL"):
-                stats["numeric_columns"].append(col)
-                cursor = self._db.execute(
-                    f'SELECT MIN("{col}"), MAX("{col}") '
-                    f'FROM "{table_name}"'
-                )
-                row = cursor.fetchone()
-                stats["min_values"][col] = row[0]
-                stats["max_values"][col] = row[1]
-
-        return stats
-
-    def _get_sample(
-        self, table_name: str, columns: list[str]
-    ) -> list[dict]:
-        """Retrieve a small sample of records for the LLM summary."""
-        col_names = ", ".join(f'"{c}"' for c in columns)
-        cursor = self._db.execute(
-            f'SELECT {col_names} FROM "{table_name}" '
-            f"LIMIT {self.config.summary_sample_size}"
-        )
-        rows = cursor.fetchall()
-        return [dict(zip(columns, row)) for row in rows]
 
     def _build_summary(
         self,
@@ -529,22 +446,22 @@ class ResponseSpooler:
         return hashlib.sha256(raw.encode()).hexdigest()[:12]
 
     def cleanup(self) -> None:
-        """Close the database and optionally remove the file."""
-        if self._db:
-            self._db.close()
-            self._db = None
+        """Release the backend's resources."""
+        if self._initialised:
+            self.backend.cleanup()
             self._initialised = False
 
-            if self.config.db_cleanup_on_exit:
-                db_path = Path(self.config.db_path)
-                if db_path.exists():
-                    db_path.unlink()
-                    logger.info(
-                        "Cleaned up spooler database at %s", db_path
-                    )
-
     def get_connection(self) -> sqlite3.Connection:
-        """Return the database connection for use by the query engine."""
-        if not self._initialised or not self._db:
+        """Return the SQLite connection when the default backend is in use.
+
+        Retained for callers that drive ``QueryEngine`` directly. Raises
+        RuntimeError if the spooler is not initialised or a non-SQLite
+        backend is configured.
+        """
+        if not self._initialised:
             raise RuntimeError("Spooler not initialised.")
-        return self._db
+        if not isinstance(self.backend, SQLiteSpoolBackend):
+            raise RuntimeError(
+                "get_connection() is only available with the SQLite backend."
+            )
+        return self.backend.connection

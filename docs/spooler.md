@@ -228,6 +228,64 @@ Unique values and frequency counts for a column.
 
 Returns values sorted by frequency (most common first).
 
+## Storage Backends
+
+Storage sits behind the `SpoolBackend` protocol (`spindl.spooler.backend`).
+`ResponseSpooler` flattens arrays and builds the summary response; the
+backend stores rows and answers the four query tools. The default is
+`SQLiteSpoolBackend`, built from `db_path`, so existing configurations are
+unchanged.
+
+A single SQLite file is process-local. When a server runs as several
+replicas behind a load balancer, a follow-up `spooler_query` can land on a
+replica that never created the spool. For that deployment, inject a shared
+backend:
+
+```python
+from spindl import MCPServer, SpoolerConfig
+
+server = MCPServer(
+    prefix="myapp",
+    spooler=SpoolerConfig(backend=MySharedBackend(pool)),
+)
+```
+
+A backend implements these synchronous methods. Every read takes an
+optional `scope`; `create_spool` returns the `stats` and `sample` used in the
+summary response:
+
+| Method | Purpose |
+| --- | --- |
+| `initialise()` / `cleanup()` | Open and release resources |
+| `create_spool(spool_id=, source_tool=, array_path=, columns=, column_types=, rows=, description=, scope=, ttl=)` | Store flattened rows |
+| `list_spools(scope=)` | `{"total_spools", "spools"}` |
+| `query(spool_id, columns=, filters=, sort_by=, sort_order=, page=, page_size=, search=, search_columns=, scope=)` | A page of records |
+| `aggregate(spool_id, group_by=, aggregates=, filters=, sort_by=, sort_order=, limit=, page=, page_size=, scope=)` | Grouped aggregates |
+| `distinct(spool_id, column, limit=, scope=)` | Distinct values |
+| `delete_spool(spool_id, scope=)` | Remove a spool |
+
+Reads return `{"error": {"message": ..., "recoverable": bool}}` for an
+unknown, expired, or out-of-scope spool. The built-in tools and the summary
+response shape (`spool_id`, `total_records`, `sample_records`, `query_hint`,
+`_spooler_meta.instructions`) do not change with the backend.
+
+### Scope
+
+A spool created with a scope is visible only to reads carrying the same
+scope. Reads without a scope see every spool, which is the behaviour when
+authentication is off. When authentication is enabled (see
+[transports.md](transports.md)) and `scope_from_identity` is true (the
+default), the spooler uses the caller's token subject as the scope, so one
+caller cannot list or query another caller's spools. `process_response` also
+accepts an explicit `scope=` for callers that manage tenancy themselves.
+
+### Expiry
+
+`process_response(..., ttl=seconds)` or `SpoolerConfig(default_ttl_seconds=...)`
+(environment variable `SPOOLER_DEFAULT_TTL_SECONDS`) gives spools a lifetime.
+Expired spools are not listed and cannot be queried. Backends are free to
+purge expired rows lazily.
+
 ## Data Flattening
 
 The spooler automatically flattens nested objects using dot notation:

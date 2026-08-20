@@ -6,7 +6,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -73,13 +72,11 @@ class SpoolerDistinctTool(BaseTool):
     async def execute(self, **params: Any) -> dict:
         try:
             validated = self.InputModel(**params)
+            self._spooler.require_initialised()
 
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
-            )
-            result = engine.get_distinct_values(
+            result = self._spooler.backend.distinct(
                 spool_id=validated.spool_id,
+                scope=self._spooler.current_scope(),
                 column=validated.column,
                 limit=validated.limit,
             )
