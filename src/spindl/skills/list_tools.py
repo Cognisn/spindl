@@ -47,10 +47,12 @@ class ListToolsTool(BaseTool):
                 cat = tool["category"]
                 if cat not in categories:
                     categories[cat] = []
-                categories[cat].append({
-                    "name": tool["name"],
-                    "description": tool["description"],
-                })
+                categories[cat].append(
+                    {
+                        "name": tool["name"],
+                        "description": tool["description"],
+                    }
+                )
 
             return ResponseEnvelope(
                 success=True,

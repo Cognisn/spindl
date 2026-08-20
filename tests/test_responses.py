@@ -1,9 +1,9 @@
 """Tests for response types."""
 
 from spindl.responses import (
+    ErrorDetail,
     ResponseEnvelope,
     ResponseMetadata,
-    ErrorDetail,
     StructuredError,
 )
 

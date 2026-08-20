@@ -16,7 +16,6 @@ import re
 from contextvars import ContextVar
 from typing import Optional
 
-
 # Per-request instance prefix, set by HTTP transport middleware.
 _instance_prefix_var: ContextVar[Optional[str]] = ContextVar(
     "spindl_instance_prefix", default=None
@@ -94,6 +93,7 @@ class PrefixResolver:
         Only replaces @references that match a registered tool name.
         Unknown @references are left untouched.
         """
+
         def _replace(match: re.Match) -> str:
             name = match.group(1)
             if name in self._known_names:
@@ -110,7 +110,7 @@ class PrefixResolver:
         """
         prefix = self.full_prefix + "_"
         if wire_name.startswith(prefix):
-            return wire_name[len(prefix):]
+            return wire_name[len(prefix) :]
         return None
 
     @property

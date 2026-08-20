@@ -48,16 +48,13 @@ class TestMCPServerSetup:
         assert "demo_spooler_list" not in names
 
 
-
 class TestMCPServerToolCalls:
     @pytest.mark.asyncio
     async def test_call_registered_tool(self, sample_tool):
         server = MCPServer(prefix="demo")
         server.register(sample_tool)
         await server._setup()
-        results = await server._handle_call_tool(
-            "demo_get_devices", {"limit": 10}
-        )
+        results = await server._handle_call_tool("demo_get_devices", {"limit": 10})
         assert len(results) == 1
         import json
 
@@ -68,9 +65,7 @@ class TestMCPServerToolCalls:
     async def test_call_unknown_tool(self):
         server = MCPServer(prefix="demo")
         await server._setup()
-        results = await server._handle_call_tool(
-            "demo_nonexistent", {}
-        )
+        results = await server._handle_call_tool("demo_nonexistent", {})
         import json
 
         data = json.loads(results[0].text)
@@ -81,9 +76,7 @@ class TestMCPServerToolCalls:
     async def test_call_list_tools(self):
         server = MCPServer(prefix="demo")
         await server._setup()
-        results = await server._handle_call_tool(
-            "demo_list_tools", {}
-        )
+        results = await server._handle_call_tool("demo_list_tools", {})
         import json
 
         data = json.loads(results[0].text)
@@ -119,8 +112,7 @@ class TestMCPServerToolCalls:
 
             async def execute(self, **params):
                 items = [
-                    {"id": i, "name": f"item-{i}", "value": i * 10}
-                    for i in range(50)
+                    {"id": i, "name": f"item-{i}", "value": i * 10} for i in range(50)
                 ]
                 return {"success": True, "data": items}
 

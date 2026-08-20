@@ -52,29 +52,19 @@ class SpoolerConfig:
         )
     )
     max_inline_tokens: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_INLINE_TOKENS", "2000")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_INLINE_TOKENS", "2000"))
     )
     max_inline_items: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_INLINE_ITEMS", "10")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_INLINE_ITEMS", "10"))
     )
     default_page_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_DEFAULT_PAGE_SIZE", "20")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_DEFAULT_PAGE_SIZE", "20"))
     )
     max_page_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_PAGE_SIZE", "50")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_PAGE_SIZE", "50"))
     )
     summary_sample_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_SUMMARY_SAMPLE_SIZE", "3")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_SUMMARY_SAMPLE_SIZE", "3"))
     )
     chars_per_token: int = 4
     backend: Optional[Any] = None
@@ -89,7 +79,8 @@ class SpoolerConfig:
     db_cleanup_on_exit: bool = field(
         default_factory=lambda: os.environ.get(
             "SPOOLER_CLEANUP_ON_EXIT", "true"
-        ).lower() == "true"
+        ).lower()
+        == "true"
     )
 
     def estimate_tokens(self, text: str) -> int:
@@ -101,9 +92,7 @@ class SpoolerConfig:
         if self.max_page_size < 1:
             raise ValueError("max_page_size must be at least 1")
         if self.default_page_size > self.max_page_size:
-            raise ValueError(
-                "default_page_size cannot exceed max_page_size"
-            )
+            raise ValueError("default_page_size cannot exceed max_page_size")
         if self.max_inline_items < 0:
             raise ValueError("max_inline_items must be non-negative")
 

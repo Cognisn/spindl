@@ -16,8 +16,7 @@ class SpoolerDistinctTool(BaseTool):
 
     name = "spooler_distinct"
     description = (
-        "Get distinct values and frequency counts for a column "
-        "in spooled data"
+        "Get distinct values and frequency counts for a column " "in spooled data"
     )
     category = "spooler"
 
@@ -85,12 +84,8 @@ class SpoolerDistinctTool(BaseTool):
                 return StructuredError(
                     error=ErrorDetail(
                         error_code="DISTINCT_ERROR",
-                        error_message=result["error"].get(
-                            "message", "Unknown error"
-                        ),
-                        retry_eligible=result["error"].get(
-                            "recoverable", False
-                        ),
+                        error_message=result["error"].get("message", "Unknown error"),
+                        retry_eligible=result["error"].get("recoverable", False),
                         suggestion=(
                             "Check the spool_id and column name. "
                             "Use @spooler_list to see available "
@@ -108,15 +103,11 @@ class SpoolerDistinctTool(BaseTool):
                     error_code="SPOOLER_UNAVAILABLE",
                     error_message=str(exc),
                     retry_eligible=False,
-                    suggestion=(
-                        "The response spooler is not initialised."
-                    ),
+                    suggestion=("The response spooler is not initialised."),
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error(
-                "Unexpected error in spooler_distinct: %s", exc
-            )
+            logger.error("Unexpected error in spooler_distinct: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

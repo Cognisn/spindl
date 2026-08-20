@@ -35,9 +35,7 @@ class ToolRegistry:
         if not tool.name:
             raise ValueError("Tool must have a non-empty name")
         if tool.name in self._tools:
-            raise ValueError(
-                f"Tool name '{tool.name}' is already registered"
-            )
+            raise ValueError(f"Tool name '{tool.name}' is already registered")
         self._tools[tool.name] = tool
         self._prefix_resolver.register_known_name(tool.name)
         logger.debug(
@@ -94,11 +92,13 @@ class ToolRegistry:
         """
         result = []
         for tool in self._tools.values():
-            result.append({
-                "name": self._prefix_resolver.prefixed_name(tool.name),
-                "category": tool.category,
-                "description": tool.description,
-            })
+            result.append(
+                {
+                    "name": self._prefix_resolver.prefixed_name(tool.name),
+                    "category": tool.category,
+                    "description": tool.description,
+                }
+            )
         # Sort by category then name for consistent output
         result.sort(key=lambda t: (t["category"], t["name"]))
         return result

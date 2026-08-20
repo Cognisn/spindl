@@ -142,9 +142,7 @@ class SpoolerQueryTool(BaseTool):
                         error_message=result["error"].get(
                             "message", "Unknown query error"
                         ),
-                        retry_eligible=result["error"].get(
-                            "recoverable", False
-                        ),
+                        retry_eligible=result["error"].get("recoverable", False),
                         suggestion=(
                             "Check the spool_id, column names, and "
                             "filter syntax. Use @spooler_list to see "
