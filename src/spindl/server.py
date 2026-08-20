@@ -151,7 +151,7 @@ class MCPServer:
     def _register_handlers_v2(self) -> None:
         from mcp import types
 
-        async def handle_list_tools(  # NOSONAR(python:S7503) SDK requires a coroutine
+        async def handle_list_tools(  # NOSONAR - SDK requires a coroutine
             ctx: Any, params: Any
         ) -> types.ListToolsResult:
             return types.ListToolsResult(

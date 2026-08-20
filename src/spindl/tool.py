@@ -49,9 +49,7 @@ class BaseTool:
     category: str = ""
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
-    InputModel: type[BaseModel] | None = (  # NOSONAR(python:S116) public API name
-        None  # NOSONAR - PascalCase is correct for a class type
-    )
+    InputModel: type[BaseModel] | None = None  # NOSONAR - PascalCase: class type
 
     @property
     def input_schema(self) -> dict[str, Any]:

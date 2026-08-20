@@ -64,9 +64,7 @@ class SpoolBackend(Protocol):
         records) for the summary response.
         """
 
-    async def list_spools(  # NOSONAR(python:S7503) protocol requires a coroutine
-        self, *, scope: Optional[str] = None
-    ) -> dict[str, Any]:
+    async def list_spools(self, *, scope: Optional[str] = None) -> dict[str, Any]:
         """Return ``{"total_spools": int, "spools": [...]}`` visible to ``scope``."""
 
     async def query(
@@ -141,7 +139,7 @@ class SQLiteSpoolBackend:
     async def cleanup(self) -> None:
         self._sync_cleanup()
 
-    async def create_spool(  # NOSONAR(python:S7503) protocol requires a coroutine
+    async def create_spool(  # NOSONAR - async protocol; SQLite needs no await
         self, **kwargs: Any
     ) -> dict[str, Any]:
         return self._sync_create_spool(**kwargs)
@@ -149,7 +147,7 @@ class SQLiteSpoolBackend:
     async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         return self._sync_delete_spool(spool_id, scope=scope)
 
-    async def list_spools(  # NOSONAR(python:S7503) protocol requires a coroutine
+    async def list_spools(  # NOSONAR - async protocol; SQLite needs no await
         self, *, scope: Optional[str] = None
     ) -> dict[str, Any]:
         return self._sync_list_spools(scope=scope)
