@@ -82,7 +82,7 @@ class MCPServer:
         # Initialise spooler if configured
         if self._spooler_config is not None:
             self._spooler = ResponseSpooler(self._spooler_config)
-            self._spooler.initialise()
+            await self._spooler.initialise_async()
             self._auto_register_spooler_tools()
 
         # Always register skills guide tools (last, so they see
@@ -158,7 +158,7 @@ class MCPServer:
             result = await tool.execute(**params)
 
             # Apply response spooling if tool opted in
-            result = self._maybe_spool_response(tool, result)
+            result = await self._maybe_spool_response(tool, result)
 
             result_json = json.dumps(result, default=str)
 
@@ -178,7 +178,7 @@ class MCPServer:
             ).to_dict()
             return [TextContent(type="text", text=json.dumps(error))]
 
-    def _maybe_spool_response(self, tool: BaseTool, result: dict) -> dict:
+    async def _maybe_spool_response(self, tool: BaseTool, result: dict) -> dict:
         """Apply response spooling if the tool has opted in."""
         if self._spooler is None:
             return result
@@ -198,7 +198,7 @@ class MCPServer:
             return result
 
         try:
-            processed = self._spooler.process_response(
+            processed = await self._spooler.process_response(
                 response=data,
                 source_tool=tool.name,
                 array_paths=array_paths,
@@ -369,7 +369,7 @@ class MCPServer:
     async def _cleanup(self) -> None:
         """Clean up resources on shutdown."""
         if self._spooler:
-            self._spooler.cleanup()
+            await self._spooler.cleanup_async()
 
 
 def _header(scope: Any, name: str) -> Optional[str]:

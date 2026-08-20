@@ -74,7 +74,7 @@ class SpoolerDistinctTool(BaseTool):
             validated = self.InputModel(**params)
             self._spooler.require_initialised()
 
-            result = self._spooler.backend.distinct(
+            result = await self._spooler.backend.distinct(
                 spool_id=validated.spool_id,
                 scope=self._spooler.current_scope(),
                 column=validated.column,
