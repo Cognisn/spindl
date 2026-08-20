@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+- Resource-server authentication for the HTTP and SSE transports via
+  `MCPServer(auth=AuthConfig(...))`: bearer-token verification through a
+  pluggable `TokenVerifier`, scope enforcement, the RFC 9728 protected-resource
+  metadata document, and `401`/`403` challenges (#6)
+- `spindl.current_identity()` to read the authenticated caller's `AccessToken`
+  from within `BaseTool.execute`
+- `MCPServer.build_http_app()` and `build_sse_app()` return the Starlette
+  application for embedding or testing
+
+### Fixed
+- The HTTP streamable transport now uses the SDK's `StreamableHTTPSessionManager`;
+  the previous implementation called the transport with an incompatible
+  signature and could not serve requests
+
 ### Fixed
 - Pinned `mcp<2.0.0`: the 2.0 SDK removed the low-level `Server.list_tools` and
   `call_tool` decorators that `MCPServer` relies on, breaking server start-up
