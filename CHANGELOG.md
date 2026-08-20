@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0a1] - 2026-08-20
+
 ### Added
 - Resource-server authentication for the HTTP and SSE transports via
   `MCPServer(auth=AuthConfig(...))`: bearer-token verification through a
