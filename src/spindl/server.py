@@ -151,7 +151,9 @@ class MCPServer:
     def _register_handlers_v2(self) -> None:
         from mcp import types
 
-        async def handle_list_tools(ctx: Any, params: Any) -> types.ListToolsResult:
+        async def handle_list_tools(  # NOSONAR: the SDK requires a coroutine
+            ctx: Any, params: Any
+        ) -> types.ListToolsResult:
             return types.ListToolsResult(
                 tools=self._registry.get_mcp_tool_definitions()
             )
