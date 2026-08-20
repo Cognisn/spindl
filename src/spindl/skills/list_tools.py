@@ -37,12 +37,12 @@ class ListToolsTool(BaseTool):
             "*No parameters required.*\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             tools = self._registry.list_tools_metadata()
 
             # Group by category
-            categories: dict[str, list[dict]] = {}
+            categories: dict[str, list[dict[str, Any]]] = {}
             for tool in tools:
                 cat = tool["category"]
                 if cat not in categories:

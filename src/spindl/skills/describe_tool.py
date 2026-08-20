@@ -46,7 +46,7 @@ class DescribeToolTool(BaseTool):
             "to describe, as returned by @list_tools\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
 

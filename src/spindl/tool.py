@@ -54,7 +54,7 @@ class BaseTool:
     )
 
     @property
-    def input_schema(self) -> dict:
+    def input_schema(self) -> dict[str, Any]:
         """Return JSON Schema for this tool's input parameters.
 
         Auto-generated from the InputModel Pydantic class if defined.
@@ -97,7 +97,7 @@ class BaseTool:
 
         return "\n".join(lines)
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         """Execute the tool with the given parameters.
 
         Must be overridden by subclasses.

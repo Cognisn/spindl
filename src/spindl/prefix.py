@@ -94,7 +94,7 @@ class PrefixResolver:
         Unknown @references are left untouched.
         """
 
-        def _replace(match: re.Match) -> str:
+        def _replace(match: re.Match[str]) -> str:
             name = match.group(1)
             if name in self._known_names:
                 return self.prefixed_name(name)

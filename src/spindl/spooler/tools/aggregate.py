@@ -29,14 +29,14 @@ class SpoolerAggregateTool(BaseTool):
             default=None,
             description="Columns to group by",
         )
-        aggregates: Optional[list[dict]] = Field(
+        aggregates: Optional[list[dict[str, Any]]] = Field(
             default=None,
             description=(
                 "Aggregation operations. Each dict has: function "
                 "(count/countdistinct/sum/avg/min/max), column, alias"
             ),
         )
-        filters: Optional[list[dict]] = Field(
+        filters: Optional[list[dict[str, Any]]] = Field(
             default=None,
             description="Optional filters before aggregation",
         )
@@ -118,12 +118,12 @@ class SpoolerAggregateTool(BaseTool):
             "- @spooler_distinct -- unique value discovery\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
             self._spooler.require_initialised()
 
-            result = await self._spooler.backend.aggregate(
+            result: dict[str, Any] = await self._spooler.backend.aggregate(
                 spool_id=validated.spool_id,
                 scope=self._spooler.current_scope(),
                 group_by=validated.group_by,

@@ -56,7 +56,7 @@ class QueryEngine:
         self.db = db
         self.config = config or SpoolerConfig()
 
-    def list_spools(self) -> dict:
+    def list_spools(self) -> dict[str, Any]:
         """List all available spools with their metadata."""
         cursor = self.db.execute("""SELECT r.spool_id, r.source_tool, r.array_path,
                       r.total_records, r.column_names, r.created_at,
@@ -88,14 +88,14 @@ class QueryEngine:
         self,
         spool_id: str,
         columns: Optional[list[str]] = None,
-        filters: Optional[list[dict]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
         page: int = 1,
         page_size: Optional[int] = None,
         search: Optional[str] = None,
         search_columns: Optional[list[str]] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Query spooled data with filtering, sorting, and pagination."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -181,14 +181,14 @@ class QueryEngine:
         self,
         spool_id: str,
         group_by: Optional[list[str]] = None,
-        aggregates: Optional[list[dict]] = None,
-        filters: Optional[list[dict]] = None,
+        aggregates: Optional[list[dict[str, Any]]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "desc",
         limit: int = 50,
         page: int = 1,
         page_size: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Aggregate spooled data with grouping and filters."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -247,7 +247,7 @@ class QueryEngine:
         spool_id: str,
         column: str,
         limit: int = 50,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get distinct values for a column with frequency counts."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -285,9 +285,9 @@ class QueryEngine:
 
     def _build_aggregate_exprs(
         self,
-        aggregates: list[dict],
+        aggregates: list[dict[str, Any]],
         valid_columns: list[str],
-    ) -> tuple[list[str], list[str]] | dict:
+    ) -> tuple[list[str], list[str]] | dict[str, Any]:
         """Build SQL aggregate expressions from aggregate definitions."""
         agg_exprs = []
         agg_aliases = []
@@ -317,7 +317,7 @@ class QueryEngine:
         col: str,
         alias: str,
         valid_columns: list[str],
-    ) -> str | dict:
+    ) -> str | dict[str, Any]:
         """Build a single SQL aggregate expression."""
         safe_alias = re.sub(r"\W", "_", alias)
 
@@ -338,7 +338,7 @@ class QueryEngine:
         self,
         group_by: Optional[list[str]],
         valid_columns: list[str],
-    ) -> list[str] | dict:
+    ) -> list[str] | dict[str, Any]:
         """Validate and build quoted group-by column references."""
         if not group_by:
             return []
@@ -376,17 +376,17 @@ class QueryEngine:
         full_where: str,
         group_clause: str,
         order_clause: str,
-        where_params: list,
+        where_params: list[Any],
         group_cols: list[str],
         agg_aliases: list[str],
         spool_id: str,
         group_by: Optional[list[str]],
-        aggregates: list[dict],
-        filters: Optional[list[dict]],
+        aggregates: list[dict[str, Any]],
+        filters: Optional[list[dict[str, Any]]],
         limit: int,
         page: int,
         page_size: Optional[int],
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Execute the aggregate query with optional pagination."""
         use_pagination = page_size is not None or page > 1
 
@@ -454,7 +454,7 @@ class QueryEngine:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _get_spool_registry(self, spool_id: str) -> Optional[dict]:
+    def _get_spool_registry(self, spool_id: str) -> Optional[dict[str, Any]]:
         """Fetch spool metadata from the registry."""
         cursor = self.db.execute(
             "SELECT * FROM _spool_registry WHERE spool_id = ?",
@@ -478,7 +478,7 @@ class QueryEngine:
         self,
         requested: Optional[list[str]],
         valid: list[str],
-    ) -> list[str] | dict:
+    ) -> list[str] | dict[str, Any]:
         """Validate requested columns against the schema."""
         if requested is None:
             return valid
@@ -494,9 +494,9 @@ class QueryEngine:
 
     def _build_where(
         self,
-        filters: Optional[list[dict]],
+        filters: Optional[list[dict[str, Any]]],
         valid_columns: list[str],
-    ) -> tuple[str, list] | tuple[dict, list]:
+    ) -> tuple[str, list[Any]] | tuple[dict[str, Any], list[Any]]:
         """Build a parameterised WHERE clause from filter dicts."""
         if not filters:
             return "", []
@@ -554,7 +554,7 @@ class QueryEngine:
         search_columns: Optional[list[str]],
         valid_columns: list[str],
         table_name: str,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, list[Any]]:
         """Build a LIKE-based search clause across text columns."""
         if not search:
             return "", []
@@ -583,7 +583,7 @@ class QueryEngine:
 
         return f"({' OR '.join(like_clauses)})", params
 
-    def _error(self, message: str) -> dict:
+    def _error(self, message: str) -> dict[str, Any]:
         """Create a standardised error response."""
         return {
             "error": {

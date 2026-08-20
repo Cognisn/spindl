@@ -68,12 +68,12 @@ class SpoolerDistinctTool(BaseTool):
             "4. Use @spooler_aggregate for summary statistics\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
             self._spooler.require_initialised()
 
-            result = await self._spooler.backend.distinct(
+            result: dict[str, Any] = await self._spooler.backend.distinct(
                 spool_id=validated.spool_id,
                 scope=self._spooler.current_scope(),
                 column=validated.column,

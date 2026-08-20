@@ -53,7 +53,7 @@ class SpoolerListSpoolsTool(BaseTool):
             "to see all available spools\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             self._spooler.require_initialised()
             result = await self._spooler.backend.list_spools(

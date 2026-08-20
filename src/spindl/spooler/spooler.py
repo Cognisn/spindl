@@ -97,13 +97,13 @@ class ResponseSpooler:
 
     async def process_response(
         self,
-        response: dict | list,
+        response: dict[str, Any] | list[Any],
         source_tool: str,
         array_paths: Optional[list[str]] = None,
         description: Optional[str] = None,
         scope: Optional[str] = None,
         ttl: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Process an API response, spooling large arrays to the backend.
 
         Args:
@@ -172,14 +172,14 @@ class ResponseSpooler:
 
     async def _process_array_path(
         self,
-        response: dict,
-        remaining_response: dict,
+        response: dict[str, Any],
+        remaining_response: dict[str, Any],
         path: str,
         source_tool: str,
         description: Optional[str],
         scope: Optional[str] = None,
         ttl: Optional[int] = None,
-    ) -> Optional[dict]:
+    ) -> Optional[dict[str, Any]]:
         """Process a single array path, returning spool info if spooled."""
         array_data = self._extract_path(response, path)
         if array_data is None or not isinstance(array_data, list):
@@ -211,10 +211,10 @@ class ResponseSpooler:
         )
 
     def _detect_arrays(
-        self, data: dict, prefix: str = "", max_depth: int = 3
+        self, data: dict[str, Any], prefix: str = "", max_depth: int = 3
     ) -> list[str]:
         """Auto-detect array fields in a response, up to max_depth."""
-        arrays = []
+        arrays: list[str] = []
         if max_depth <= 0:
             return arrays
 
@@ -228,7 +228,7 @@ class ResponseSpooler:
 
         return arrays
 
-    def _extract_path(self, data: dict, path: str) -> Any:
+    def _extract_path(self, data: dict[str, Any], path: str) -> Any:
         """Extract a value from a nested dict using dot notation."""
         parts = path.split(".")
         current = data
@@ -239,7 +239,7 @@ class ResponseSpooler:
                 return None
         return current
 
-    def _set_path(self, data: dict, path: str, value: Any) -> dict:
+    def _set_path(self, data: dict[str, Any], path: str, value: Any) -> dict[str, Any]:
         """Set a value in a nested dict using dot notation."""
         parts = path.split(".")
         current = data
@@ -250,7 +250,9 @@ class ResponseSpooler:
         current[parts[-1]] = value
         return data
 
-    def _deep_copy_without_arrays(self, data: dict, array_paths: list[str]) -> dict:
+    def _deep_copy_without_arrays(
+        self, data: dict[str, Any], array_paths: list[str]
+    ) -> dict[str, Any]:
         """Create a copy of the response with spooled arrays removed."""
         result = copy.deepcopy(data)
         for path in array_paths:
@@ -268,13 +270,13 @@ class ResponseSpooler:
 
     async def _spool_array(
         self,
-        array_data: list[dict],
+        array_data: list[dict[str, Any]],
         source_tool: str,
         array_path: str,
         description: Optional[str] = None,
         scope: Optional[str] = None,
         ttl: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Flatten an array and store it through the backend."""
         spool_id = self._generate_spool_id(source_tool, array_path)
 
@@ -303,7 +305,9 @@ class ResponseSpooler:
             "sample": stored["sample"],
         }
 
-    def _flatten_array(self, array_data: list[dict]) -> tuple[list[str], list[tuple]]:
+    def _flatten_array(
+        self, array_data: list[dict[str, Any]]
+    ) -> tuple[list[str], list[tuple[Any, ...]]]:
         """Flatten an array of potentially nested dicts into tabular form."""
         all_keys: dict[str, None] = {}
         for item in array_data:
@@ -327,7 +331,9 @@ class ResponseSpooler:
 
         return columns, rows
 
-    def _flatten_dict(self, d: dict, prefix: str = "", separator: str = ".") -> dict:
+    def _flatten_dict(
+        self, d: dict[str, Any], prefix: str = "", separator: str = "."
+    ) -> dict[str, Any]:
         """Flatten a nested dictionary with dot-separated keys."""
         items: dict[str, Any] = {}
         for key, value in d.items():
@@ -341,7 +347,7 @@ class ResponseSpooler:
         return items
 
     def _infer_column_types(
-        self, columns: list[str], rows: list[tuple]
+        self, columns: list[str], rows: list[tuple[Any, ...]]
     ) -> dict[str, str]:
         """Infer SQLite column types from the actual data values."""
         types: dict[str, str] = {}
@@ -365,10 +371,10 @@ class ResponseSpooler:
 
     def _build_summary(
         self,
-        remaining_response: dict,
-        spooled_arrays: list[dict],
+        remaining_response: dict[str, Any],
+        spooled_arrays: list[dict[str, Any]],
         source_tool: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Build the LLM-friendly summary response.
 
         Uses @placeholder syntax for tool name references which
@@ -422,7 +428,7 @@ class ResponseSpooler:
             },
         }
 
-    def _size_guard(self, response: dict) -> dict:
+    def _size_guard(self, response: dict[str, Any]) -> dict[str, Any]:
         """Apply size guard to non-array responses."""
         serialised = json.dumps(response)
         estimated_tokens = self.config.estimate_tokens(serialised)
