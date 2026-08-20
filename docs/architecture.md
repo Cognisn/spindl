@@ -155,6 +155,11 @@ Spindl uses `mcp.server.Server` (not `FastMCP`) for full control over:
 - Response post-processing (spooling, placeholder resolution)
 - Transport selection
 
+Both `mcp` 1.x and 2.x are supported. The 2.0 SDK replaced the `list_tools` and
+`call_tool` decorators with `add_request_handler(method, params_type, handler)`;
+`MCPServer._register_handlers` detects which API the installed SDK exposes and
+registers the `tools/list` and `tools/call` handlers accordingly.
+
 ### The spooler core has zero external dependencies
 
 `config.py`, `spooler.py`, and `query_engine.py` use only Python stdlib (`sqlite3`, `json`, `hashlib`, `copy`, `re`). The `pydantic` dependency is only in the tool layer (`InputModel` definitions) and response types.

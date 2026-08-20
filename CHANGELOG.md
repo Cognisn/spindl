@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- Support for `mcp` 2.x alongside 1.x (`mcp>=1.25,<3`): handler registration
+  uses `add_request_handler` on 2.x and the decorator API on 1.x (#8, #10, #11)
+- Python 3.10 and 3.11 support; `requires-python` lowered to `>=3.10` and the
+  CI matrix now covers 3.10 to 3.13 against both `mcp` series (#10, #11)
+
+### Changed
+- `httpx` and `pytest-timeout` added to the `dev` extra (`mcp` 2.x no longer
+  depends on `httpx`)
+
 ## [0.2.0a3] - 2026-08-20
 
 ### Added

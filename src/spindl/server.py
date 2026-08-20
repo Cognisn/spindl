@@ -123,7 +123,19 @@ class MCPServer:
         self._registry.register(DescribeToolTool(registry=self._registry))
 
     def _register_handlers(self) -> None:
-        """Wire MCP protocol handlers to the SDK server."""
+        """Wire MCP protocol handlers to the SDK server.
+
+        The mcp SDK changed its low-level registration API in 2.0: 1.x
+        exposes ``list_tools`` and ``call_tool`` decorators, 2.x exposes
+        ``add_request_handler(method, params_type, handler)`` with a
+        ``(ctx, params) -> result`` handler. Both are supported.
+        """
+        if hasattr(self._mcp_server, "add_request_handler"):
+            self._register_handlers_v2()
+        else:
+            self._register_handlers_v1()
+
+    def _register_handlers_v1(self) -> None:
         from mcp.types import TextContent, Tool
 
         @self._mcp_server.list_tools()
@@ -135,6 +147,25 @@ class MCPServer:
             name: str, arguments: dict | None
         ) -> list[TextContent]:
             return await self._handle_call_tool(name, arguments)
+
+    def _register_handlers_v2(self) -> None:
+        from mcp import types
+
+        async def handle_list_tools(ctx: Any, params: Any) -> types.ListToolsResult:
+            return types.ListToolsResult(
+                tools=self._registry.get_mcp_tool_definitions()
+            )
+
+        async def handle_call_tool(ctx: Any, params: Any) -> types.CallToolResult:
+            content = await self._handle_call_tool(params.name, params.arguments)
+            return types.CallToolResult(content=content)
+
+        self._mcp_server.add_request_handler(
+            "tools/list", types.PaginatedRequestParams, handle_list_tools
+        )
+        self._mcp_server.add_request_handler(
+            "tools/call", types.CallToolRequestParams, handle_call_tool
+        )
 
     async def _handle_call_tool(self, name: str, arguments: dict | None) -> list[Any]:
         """Dispatch a tool call by wire name."""
