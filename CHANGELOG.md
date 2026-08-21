@@ -17,6 +17,8 @@
 ### Changed
 - Package fully typed under `mypy --strict`; black and isort applied throughout,
   with black's `target-version` pinned, so the CI lint job passes
+- CI installs from hash-locked requirement files (`requirements/ci-mcp1.txt`,
+  `requirements/ci-mcp2.txt`, regenerated with `scripts/lock-ci.sh`)
 - `httpx` and `pytest-timeout` added to the `dev` extra (`mcp` 2.x no longer
   depends on `httpx`)
 
