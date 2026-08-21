@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+- Support for `mcp` 2.x alongside 1.x (`mcp>=1.25,<3`): handler registration
+  uses `add_request_handler` on 2.x and the decorator API on 1.x (#8, #10, #11)
+- Python 3.10 and 3.11 support; `requires-python` lowered to `>=3.10` and the
+  CI matrix now covers 3.10 to 3.13 against both `mcp` series (#10, #11)
+
+### Fixed
+- Spool IDs now include random bytes as well as the timestamp. On platforms
+  with coarse clock resolution (Windows, about 15 ms) two spools created in
+  quick succession from the same tool and path could share an ID, and the
+  second silently replaced the first
+
+### Changed
+- Package fully typed under `mypy --strict`; black and isort applied throughout,
+  with black's `target-version` pinned, so the CI lint job passes
+- CI and the publish workflow install from hash-locked requirement files
+  (`requirements/ci-mcp1.txt`, `ci-mcp2.txt`, `build.txt`, regenerated with
+  `scripts/lock-ci.sh`)
+- `httpx` and `pytest-timeout` added to the `dev` extra (`mcp` 2.x no longer
+  depends on `httpx`)
+
 ## [0.2.0a3] - 2026-08-20
 
 ### Added

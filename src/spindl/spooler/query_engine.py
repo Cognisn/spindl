@@ -5,9 +5,9 @@ with pagination, filtering, sorting, and basic aggregation.
 """
 
 import json
+import logging
 import re
 import sqlite3
-import logging
 from typing import Any, Optional
 
 from spindl.spooler.config import SpoolerConfig
@@ -29,7 +29,12 @@ ALLOWED_OPERATORS = {
 }
 
 ALLOWED_AGGREGATES = {
-    "count", "countdistinct", "sum", "avg", "min", "max",
+    "count",
+    "countdistinct",
+    "sum",
+    "avg",
+    "min",
+    "max",
 }
 
 SAFE_COLUMN_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.]*$")
@@ -51,28 +56,28 @@ class QueryEngine:
         self.db = db
         self.config = config or SpoolerConfig()
 
-    def list_spools(self) -> dict:
+    def list_spools(self) -> dict[str, Any]:
         """List all available spools with their metadata."""
-        cursor = self.db.execute(
-            """SELECT r.spool_id, r.source_tool, r.array_path,
+        cursor = self.db.execute("""SELECT r.spool_id, r.source_tool, r.array_path,
                       r.total_records, r.column_names, r.created_at,
                       r.description
                FROM _spool_registry r
-               ORDER BY r.created_at DESC"""
-        )
+               ORDER BY r.created_at DESC""")
         rows = cursor.fetchall()
 
         spools = []
         for row in rows:
-            spools.append({
-                "spool_id": row[0],
-                "source_tool": row[1],
-                "array_path": row[2],
-                "total_records": row[3],
-                "columns": json.loads(row[4]),
-                "created_at": row[5],
-                "description": row[6],
-            })
+            spools.append(
+                {
+                    "spool_id": row[0],
+                    "source_tool": row[1],
+                    "array_path": row[2],
+                    "total_records": row[3],
+                    "columns": json.loads(row[4]),
+                    "created_at": row[5],
+                    "description": row[6],
+                }
+            )
 
         return {
             "total_spools": len(spools),
@@ -83,14 +88,14 @@ class QueryEngine:
         self,
         spool_id: str,
         columns: Optional[list[str]] = None,
-        filters: Optional[list[dict]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
         page: int = 1,
         page_size: Optional[int] = None,
         search: Optional[str] = None,
         search_columns: Optional[list[str]] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Query spooled data with filtering, sorting, and pagination."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -110,9 +115,7 @@ class QueryEngine:
         if isinstance(select_cols, dict):
             return select_cols
 
-        where_clause, where_params = self._build_where(
-            filters, valid_columns
-        )
+        where_clause, where_params = self._build_where(filters, valid_columns)
         if isinstance(where_clause, dict):
             return where_clause
 
@@ -139,9 +142,7 @@ class QueryEngine:
         col_expr = ", ".join(f'"{c}"' for c in select_cols)
         full_where = f"WHERE {where_clause}" if where_clause else ""
 
-        count_sql = (
-            f'SELECT COUNT(*) FROM "{table_name}" {full_where}'
-        )
+        count_sql = f'SELECT COUNT(*) FROM "{table_name}" {full_where}'
         total = self.db.execute(count_sql, where_params).fetchone()[0]
 
         query_sql = (
@@ -171,9 +172,7 @@ class QueryEngine:
             "query_info": {
                 "columns_returned": select_cols,
                 "filters_applied": filters or [],
-                "sort": (
-                    f"{sort_by} {sort_order}" if sort_by else "default"
-                ),
+                "sort": (f"{sort_by} {sort_order}" if sort_by else "default"),
                 "search": search,
             },
         }
@@ -182,14 +181,14 @@ class QueryEngine:
         self,
         spool_id: str,
         group_by: Optional[list[str]] = None,
-        aggregates: Optional[list[dict]] = None,
-        filters: Optional[list[dict]] = None,
+        aggregates: Optional[list[dict[str, Any]]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "desc",
         limit: int = 50,
         page: int = 1,
         page_size: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Aggregate spooled data with grouping and filters."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -199,13 +198,9 @@ class QueryEngine:
         valid_columns = json.loads(registry["column_names"])
 
         if not aggregates:
-            aggregates = [
-                {"function": "count", "column": "*", "alias": "total"}
-            ]
+            aggregates = [{"function": "count", "column": "*", "alias": "total"}]
 
-        agg_result = self._build_aggregate_exprs(
-            aggregates, valid_columns
-        )
+        agg_result = self._build_aggregate_exprs(aggregates, valid_columns)
         if isinstance(agg_result, dict):
             return agg_result
         agg_exprs, agg_aliases = agg_result
@@ -215,16 +210,12 @@ class QueryEngine:
             return group_result
         group_cols = group_result
 
-        where_clause, where_params = self._build_where(
-            filters, valid_columns
-        )
+        where_clause, where_params = self._build_where(filters, valid_columns)
         if isinstance(where_clause, dict):
             return where_clause
 
         full_where = f"WHERE {where_clause}" if where_clause else ""
-        group_clause = (
-            f"GROUP BY {', '.join(group_cols)}" if group_cols else ""
-        )
+        group_clause = f"GROUP BY {', '.join(group_cols)}" if group_cols else ""
 
         select_parts = list(group_cols) + agg_exprs
         select_expr = ", ".join(select_parts)
@@ -256,7 +247,7 @@ class QueryEngine:
         spool_id: str,
         column: str,
         limit: int = 50,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get distinct values for a column with frequency counts."""
         registry = self._get_spool_registry(spool_id)
         if not registry:
@@ -267,8 +258,7 @@ class QueryEngine:
 
         if not self._is_valid_column(column, valid_columns):
             return self._error(
-                f"Invalid column '{column}'. "
-                f"Valid columns: {valid_columns}"
+                f"Invalid column '{column}'. Valid columns: {valid_columns}"
             )
 
         limit = min(max(1, limit), 500)
@@ -285,9 +275,7 @@ class QueryEngine:
         return {
             "spool_id": spool_id,
             "column": column,
-            "distinct_values": [
-                {"value": row[0], "count": row[1]} for row in rows
-            ],
+            "distinct_values": [{"value": row[0], "count": row[1]} for row in rows],
             "total_distinct": len(rows),
         }
 
@@ -297,9 +285,9 @@ class QueryEngine:
 
     def _build_aggregate_exprs(
         self,
-        aggregates: list[dict],
+        aggregates: list[dict[str, Any]],
         valid_columns: list[str],
-    ) -> tuple[list[str], list[str]] | dict:
+    ) -> tuple[list[str], list[str]] | dict[str, Any]:
         """Build SQL aggregate expressions from aggregate definitions."""
         agg_exprs = []
         agg_aliases = []
@@ -315,9 +303,7 @@ class QueryEngine:
                     f"Allowed: {sorted(ALLOWED_AGGREGATES)}"
                 )
 
-            result = self._build_single_agg_expr(
-                func, col, alias, valid_columns
-            )
+            result = self._build_single_agg_expr(func, col, alias, valid_columns)
             if isinstance(result, dict):
                 return result
             agg_exprs.append(result)
@@ -331,25 +317,19 @@ class QueryEngine:
         col: str,
         alias: str,
         valid_columns: list[str],
-    ) -> str | dict:
+    ) -> str | dict[str, Any]:
         """Build a single SQL aggregate expression."""
         safe_alias = re.sub(r"\W", "_", alias)
 
         if func == "countdistinct":
             if col == "*":
-                return self._error(
-                    "countdistinct requires a column name, not '*'."
-                )
+                return self._error("countdistinct requires a column name, not '*'.")
             if not self._is_valid_column(col, valid_columns):
-                return self._error(
-                    f"Invalid column '{col}' for aggregation."
-                )
+                return self._error(f"Invalid column '{col}' for aggregation.")
             return f'COUNT(DISTINCT "{col}") AS "{safe_alias}"'
 
         if col != "*" and not self._is_valid_column(col, valid_columns):
-            return self._error(
-                f"Invalid column '{col}' for aggregation."
-            )
+            return self._error(f"Invalid column '{col}' for aggregation.")
 
         col_ref = "*" if col == "*" else f'"{col}"'
         return f'{func.upper()}({col_ref}) AS "{safe_alias}"'
@@ -358,7 +338,7 @@ class QueryEngine:
         self,
         group_by: Optional[list[str]],
         valid_columns: list[str],
-    ) -> list[str] | dict:
+    ) -> list[str] | dict[str, Any]:
         """Validate and build quoted group-by column references."""
         if not group_by:
             return []
@@ -366,9 +346,7 @@ class QueryEngine:
         group_cols = []
         for col in group_by:
             if not self._is_valid_column(col, valid_columns):
-                return self._error(
-                    f"Invalid group_by column '{col}'."
-                )
+                return self._error(f"Invalid group_by column '{col}'.")
             group_cols.append(f'"{col}"')
         return group_cols
 
@@ -384,13 +362,9 @@ class QueryEngine:
         if not sort_by:
             return ""
 
-        all_valid = (
-            [col.strip('"') for col in group_cols] + agg_aliases
-        )
+        all_valid = [col.strip('"') for col in group_cols] + agg_aliases
         if sort_by in all_valid or sort_by in valid_columns:
-            direction = (
-                "DESC" if sort_order.lower() == "desc" else "ASC"
-            )
+            direction = "DESC" if sort_order.lower() == "desc" else "ASC"
             return f'ORDER BY "{sort_by}" {direction}'
         return ""
 
@@ -402,17 +376,17 @@ class QueryEngine:
         full_where: str,
         group_clause: str,
         order_clause: str,
-        where_params: list,
+        where_params: list[Any],
         group_cols: list[str],
         agg_aliases: list[str],
         spool_id: str,
         group_by: Optional[list[str]],
-        aggregates: list[dict],
-        filters: Optional[list[dict]],
+        aggregates: list[dict[str, Any]],
+        filters: Optional[list[dict[str, Any]]],
         limit: int,
         page: int,
         page_size: Optional[int],
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Execute the aggregate query with optional pagination."""
         use_pagination = page_size is not None or page > 1
 
@@ -424,14 +398,9 @@ class QueryEngine:
             page = max(1, page)
             offset = (page - 1) * effective_page_size
 
-            inner_sql = (
-                f'SELECT 1 FROM "{table_name}" '
-                f"{full_where} {group_clause}"
-            )
+            inner_sql = f'SELECT 1 FROM "{table_name}" ' f"{full_where} {group_clause}"
             count_sql = f"SELECT COUNT(*) FROM ({inner_sql})"
-            total_groups = self.db.execute(
-                count_sql, where_params
-            ).fetchone()[0]
+            total_groups = self.db.execute(count_sql, where_params).fetchone()[0]
 
             query_sql = (
                 f'SELECT {select_expr} FROM "{table_name}" '
@@ -440,9 +409,7 @@ class QueryEngine:
             )
             params = where_params + [effective_page_size, offset]
         else:
-            effective_limit = min(
-                max(1, limit), self.config.max_page_size * 10
-            )
+            effective_limit = min(max(1, limit), self.config.max_page_size * 10)
             query_sql = (
                 f'SELECT {select_expr} FROM "{table_name}" '
                 f"{full_where} {group_clause} {order_clause} LIMIT ?"
@@ -452,9 +419,7 @@ class QueryEngine:
         cursor = self.db.execute(query_sql, params)
         rows = cursor.fetchall()
 
-        result_columns = (
-            [col.strip('"') for col in group_cols] + agg_aliases
-        )
+        result_columns = [col.strip('"') for col in group_cols] + agg_aliases
         results = [dict(zip(result_columns, row)) for row in rows]
 
         result: dict[str, Any] = {
@@ -471,8 +436,7 @@ class QueryEngine:
         if use_pagination:
             total_pages = max(
                 1,
-                (total_groups + effective_page_size - 1)
-                // effective_page_size,
+                (total_groups + effective_page_size - 1) // effective_page_size,
             )
             result["total_groups"] = total_groups
             result["pagination"] = {
@@ -490,7 +454,7 @@ class QueryEngine:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _get_spool_registry(self, spool_id: str) -> Optional[dict]:
+    def _get_spool_registry(self, spool_id: str) -> Optional[dict[str, Any]]:
         """Fetch spool metadata from the registry."""
         cursor = self.db.execute(
             "SELECT * FROM _spool_registry WHERE spool_id = ?",
@@ -514,32 +478,25 @@ class QueryEngine:
         self,
         requested: Optional[list[str]],
         valid: list[str],
-    ) -> list[str] | dict:
+    ) -> list[str] | dict[str, Any]:
         """Validate requested columns against the schema."""
         if requested is None:
             return valid
 
         invalid = [c for c in requested if c not in valid]
         if invalid:
-            return self._error(
-                f"Invalid columns: {invalid}. Valid columns: {valid}"
-            )
+            return self._error(f"Invalid columns: {invalid}. Valid columns: {valid}")
         return requested
 
-    def _is_valid_column(
-        self, col: str, valid_columns: list[str]
-    ) -> bool:
+    def _is_valid_column(self, col: str, valid_columns: list[str]) -> bool:
         """Check if a column name is valid and safe."""
-        return (
-            col in valid_columns
-            and SAFE_COLUMN_PATTERN.match(col) is not None
-        )
+        return col in valid_columns and SAFE_COLUMN_PATTERN.match(col) is not None
 
     def _build_where(
         self,
-        filters: Optional[list[dict]],
+        filters: Optional[list[dict[str, Any]]],
         valid_columns: list[str],
-    ) -> tuple[str, list] | tuple[dict, list]:
+    ) -> tuple[str, list[Any]] | tuple[dict[str, Any], list[Any]]:
         """Build a parameterised WHERE clause from filter dicts."""
         if not filters:
             return "", []
@@ -578,8 +535,7 @@ class QueryEngine:
                 if not isinstance(value, list) or len(value) == 0:
                     return (
                         self._error(
-                            "The 'in' operator requires a non-empty "
-                            "list value."
+                            "The 'in' operator requires a non-empty list value."
                         ),
                         [],
                     )
@@ -598,16 +554,14 @@ class QueryEngine:
         search_columns: Optional[list[str]],
         valid_columns: list[str],
         table_name: str,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, list[Any]]:
         """Build a LIKE-based search clause across text columns."""
         if not search:
             return "", []
 
         if search_columns:
             cols = [
-                c
-                for c in search_columns
-                if self._is_valid_column(c, valid_columns)
+                c for c in search_columns if self._is_valid_column(c, valid_columns)
             ]
         else:
             cols = []
@@ -629,7 +583,7 @@ class QueryEngine:
 
         return f"({' OR '.join(like_clauses)})", params
 
-    def _error(self, message: str) -> dict:
+    def _error(self, message: str) -> dict[str, Any]:
         """Create a standardised error response."""
         return {
             "error": {

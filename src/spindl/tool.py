@@ -49,10 +49,10 @@ class BaseTool:
     category: str = ""
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
-    InputModel: type[BaseModel] | None = None  # NOSONAR - PascalCase is correct for a class type
+    InputModel: type[BaseModel] | None = None  # NOSONAR - PascalCase: class type
 
     @property
-    def input_schema(self) -> dict:
+    def input_schema(self) -> dict[str, Any]:
         """Return JSON Schema for this tool's input parameters.
 
         Auto-generated from the InputModel Pydantic class if defined.
@@ -83,14 +83,10 @@ class BaseTool:
                 required = "required" if field_info.is_required() else "optional"
                 field_desc = field_info.description or "No description"
                 default_str = ""
-                if (
-                    not field_info.is_required()
-                    and field_info.default is not None
-                ):
+                if not field_info.is_required() and field_info.default is not None:
                     default_str = f" (default: {field_info.default})"
                 lines.append(
-                    f"- **{field_name}** ({required}): "
-                    f"{field_desc}{default_str}"
+                    f"- **{field_name}** ({required}): {field_desc}{default_str}"
                 )
             lines.append("")
         else:
@@ -99,11 +95,9 @@ class BaseTool:
 
         return "\n".join(lines)
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         """Execute the tool with the given parameters.
 
         Must be overridden by subclasses.
         """
-        raise NotImplementedError(
-            f"Tool '{self.name}' must implement execute()"
-        )
+        raise NotImplementedError(f"Tool '{self.name}' must implement execute()")

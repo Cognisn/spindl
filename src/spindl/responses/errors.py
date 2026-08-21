@@ -1,5 +1,7 @@
 """Structured error response builder."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -23,6 +25,6 @@ class StructuredError(BaseModel):
     platform: str = "spindl"
     error: ErrorDetail
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the error to a dictionary for MCP response."""
         return self.model_dump(exclude_none=True)

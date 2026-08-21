@@ -26,8 +26,7 @@ class DescribeToolTool(BaseTool):
     class InputModel(BaseModel):
         tool_name: str = Field(
             description=(
-                "The full name of the tool to describe "
-                "(as shown by list_tools)"
+                "The full name of the tool to describe (as shown by list_tools)"
             ),
         )
 
@@ -47,20 +46,17 @@ class DescribeToolTool(BaseTool):
             "to describe, as returned by @list_tools\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
 
-            guide_text = self._registry.get_tool_guide(
-                validated.tool_name
-            )
+            guide_text = self._registry.get_tool_guide(validated.tool_name)
             if guide_text is None:
                 return StructuredError(
                     error=ErrorDetail(
                         error_code="TOOL_NOT_FOUND",
                         error_message=(
-                            f"No tool found with name "
-                            f"'{validated.tool_name}'"
+                            f"No tool found with name '{validated.tool_name}'"
                         ),
                         retry_eligible=False,
                         suggestion=(

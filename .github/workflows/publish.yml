@@ -17,9 +17,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
+        run: pip install --require-hashes --only-binary :all: -r requirements/build.txt
 
       - name: Build package
         run: python -m build
@@ -43,9 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+        run: pip install --require-hashes --only-binary :all: -r requirements/ci-mcp2.txt
 
       - name: Run tests
         run: pytest -v

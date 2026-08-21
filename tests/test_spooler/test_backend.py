@@ -251,3 +251,17 @@ class TestEnvelopeUnchanged:
             assert key in entry, key
         assert "_spooler_meta" in result
         json.dumps(result)
+
+
+class TestSpoolIdUniqueness:
+    def test_ids_are_unique_when_clock_does_not_advance(
+        self, sqlite_config, monkeypatch
+    ):
+        import spindl.spooler.spooler as spooler_module
+
+        monkeypatch.setattr(
+            spooler_module.time, "time_ns", lambda: 1_700_000_000_000_000_000
+        )
+        spooler = ResponseSpooler(sqlite_config)
+        ids = {spooler._generate_spool_id("get_devices", "devices") for _ in range(200)}
+        assert len(ids) == 200

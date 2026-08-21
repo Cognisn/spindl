@@ -15,9 +15,7 @@ class SpoolerAggregateTool(BaseTool):
     """Aggregate spooled data with grouping and summary functions."""
 
     name = "spooler_aggregate"
-    description = (
-        "Aggregate spooled data with grouping and summary functions"
-    )
+    description = "Aggregate spooled data with grouping and summary functions"
     category = "spooler"
 
     class InputModel(BaseModel):
@@ -31,14 +29,14 @@ class SpoolerAggregateTool(BaseTool):
             default=None,
             description="Columns to group by",
         )
-        aggregates: Optional[list[dict]] = Field(
+        aggregates: Optional[list[dict[str, Any]]] = Field(
             default=None,
             description=(
                 "Aggregation operations. Each dict has: function "
                 "(count/countdistinct/sum/avg/min/max), column, alias"
             ),
         )
-        filters: Optional[list[dict]] = Field(
+        filters: Optional[list[dict[str, Any]]] = Field(
             default=None,
             description="Optional filters before aggregation",
         )
@@ -120,12 +118,12 @@ class SpoolerAggregateTool(BaseTool):
             "- @spooler_distinct -- unique value discovery\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
             self._spooler.require_initialised()
 
-            result = await self._spooler.backend.aggregate(
+            result: dict[str, Any] = await self._spooler.backend.aggregate(
                 spool_id=validated.spool_id,
                 scope=self._spooler.current_scope(),
                 group_by=validated.group_by,
@@ -145,9 +143,7 @@ class SpoolerAggregateTool(BaseTool):
                         error_message=result["error"].get(
                             "message", "Unknown aggregation error"
                         ),
-                        retry_eligible=result["error"].get(
-                            "recoverable", False
-                        ),
+                        retry_eligible=result["error"].get("recoverable", False),
                         suggestion=(
                             "Check the spool_id, column names, and "
                             "aggregate functions. Use @spooler_list "
@@ -165,15 +161,11 @@ class SpoolerAggregateTool(BaseTool):
                     error_code="SPOOLER_UNAVAILABLE",
                     error_message=str(exc),
                     retry_eligible=False,
-                    suggestion=(
-                        "The response spooler is not initialised."
-                    ),
+                    suggestion=("The response spooler is not initialised."),
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error(
-                "Unexpected error in spooler_aggregate: %s", exc
-            )
+            logger.exception("Unexpected error in spooler_aggregate: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

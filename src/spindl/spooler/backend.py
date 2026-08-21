@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from spindl.spooler.config import SpoolerConfig
+    from spindl.spooler.query_engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +52,11 @@ class SpoolBackend(Protocol):
         array_path: str,
         columns: list[str],
         column_types: dict[str, str],
-        rows: list[tuple],
+        rows: list[tuple[Any, ...]],
         description: Optional[str] = None,
         scope: Optional[str] = None,
         ttl: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Store flattened rows under ``spool_id``.
 
         Returns a dict with ``stats`` (``numeric_columns``, ``min_values``,
@@ -63,7 +64,7 @@ class SpoolBackend(Protocol):
         records) for the summary response.
         """
 
-    async def list_spools(self, *, scope: Optional[str] = None) -> dict:
+    async def list_spools(self, *, scope: Optional[str] = None) -> dict[str, Any]:
         """Return ``{"total_spools": int, "spools": [...]}`` visible to ``scope``."""
 
     async def query(
@@ -71,7 +72,7 @@ class SpoolBackend(Protocol):
         spool_id: str,
         *,
         columns: Optional[list[str]] = None,
-        filters: Optional[dict] = None,
+        filters: Optional[dict[str, Any]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
         page: int = 1,
@@ -79,7 +80,7 @@ class SpoolBackend(Protocol):
         search: Optional[str] = None,
         search_columns: Optional[list[str]] = None,
         scope: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Return a page of records, or ``{"error": {...}}``."""
 
     async def aggregate(
@@ -87,15 +88,15 @@ class SpoolBackend(Protocol):
         spool_id: str,
         *,
         group_by: Optional[list[str]] = None,
-        aggregates: Optional[list[dict]] = None,
-        filters: Optional[dict] = None,
+        aggregates: Optional[list[dict[str, Any]]] = None,
+        filters: Optional[dict[str, Any]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "desc",
         limit: Optional[int] = None,
         page: int = 1,
         page_size: Optional[int] = None,
         scope: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Return grouped aggregates, or ``{"error": {...}}``."""
 
     async def distinct(
@@ -105,14 +106,14 @@ class SpoolBackend(Protocol):
         *,
         limit: Optional[int] = None,
         scope: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Return distinct values for ``column``, or ``{"error": {...}}``."""
 
     async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         """Remove a spool. Returns False if absent or not visible to ``scope``."""
 
 
-def _not_found(spool_id: str) -> dict:
+def _not_found(spool_id: str) -> dict[str, Any]:
     return {
         "error": {
             "message": f"Spool '{spool_id}' not found.",
@@ -138,23 +139,27 @@ class SQLiteSpoolBackend:
     async def cleanup(self) -> None:
         self._sync_cleanup()
 
-    async def create_spool(self, **kwargs: Any) -> dict:
+    async def create_spool(  # NOSONAR - async protocol; SQLite needs no await
+        self, **kwargs: Any
+    ) -> dict[str, Any]:
         return self._sync_create_spool(**kwargs)
 
     async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         return self._sync_delete_spool(spool_id, scope=scope)
 
-    async def list_spools(self, *, scope: Optional[str] = None) -> dict:
+    async def list_spools(  # NOSONAR - async protocol; SQLite needs no await
+        self, *, scope: Optional[str] = None
+    ) -> dict[str, Any]:
         return self._sync_list_spools(scope=scope)
 
     async def query(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
-    ) -> dict:
+    ) -> dict[str, Any]:
         return self._sync_query(spool_id, scope=scope, **kw)
 
     async def aggregate(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
-    ) -> dict:
+    ) -> dict[str, Any]:
         return self._sync_aggregate(spool_id, scope=scope, **kw)
 
     async def distinct(
@@ -164,7 +169,7 @@ class SQLiteSpoolBackend:
         *,
         limit: Optional[int] = None,
         scope: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         return self._sync_distinct(spool_id, column, limit=limit, scope=scope)
 
     # -- lifecycle -----------------------------------------------------------
@@ -242,11 +247,11 @@ class SQLiteSpoolBackend:
         array_path: str,
         columns: list[str],
         column_types: dict[str, str],
-        rows: list[tuple],
+        rows: list[tuple[Any, ...]],
         description: Optional[str] = None,
         scope: Optional[str] = None,
         ttl: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         db = self.connection
         table_name = f"spool_{spool_id}"
 
@@ -316,7 +321,7 @@ class SQLiteSpoolBackend:
 
     # -- reads ---------------------------------------------------------------
 
-    def _sync_list_spools(self, *, scope: Optional[str] = None) -> dict:
+    def _sync_list_spools(self, *, scope: Optional[str] = None) -> dict[str, Any]:
         db = self.connection
         where, params = self._visibility_clause(scope)
         cursor = db.execute(
@@ -342,14 +347,14 @@ class SQLiteSpoolBackend:
 
     def _sync_query(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
-    ) -> dict:
+    ) -> dict[str, Any]:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
         return self._engine().query(spool_id=spool_id, **kw)
 
     def _sync_aggregate(
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
-    ) -> dict:
+    ) -> dict[str, Any]:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
         return self._engine().aggregate(spool_id=spool_id, **kw)
@@ -361,16 +366,17 @@ class SQLiteSpoolBackend:
         *,
         limit: Optional[int] = None,
         scope: Optional[str] = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
-        return self._engine().get_distinct_values(
-            spool_id=spool_id, column=column, limit=limit
-        )
+        kwargs: dict[str, Any] = {"spool_id": spool_id, "column": column}
+        if limit is not None:
+            kwargs["limit"] = limit
+        return self._engine().get_distinct_values(**kwargs)
 
     # -- helpers -------------------------------------------------------------
 
-    def _engine(self) -> Any:
+    def _engine(self) -> "QueryEngine":
         from spindl.spooler.query_engine import QueryEngine
 
         return QueryEngine(self.connection, self.config)
@@ -393,11 +399,12 @@ class SQLiteSpoolBackend:
             f"SELECT * FROM _spool_registry {where} AND spool_id = ?",
             [*params, spool_id],
         )
-        return cursor.fetchone()
+        row: Optional[sqlite3.Row] = cursor.fetchone()
+        return row
 
     def _compute_stats(
         self, table_name: str, columns: list[str], col_types: dict[str, str]
-    ) -> dict:
+    ) -> dict[str, Any]:
         db = self.connection
         stats: dict[str, Any] = {
             "numeric_columns": [],
@@ -418,7 +425,7 @@ class SQLiteSpoolBackend:
                 stats["max_values"][col] = row[1]
         return stats
 
-    def _get_sample(self, table_name: str, columns: list[str]) -> list[dict]:
+    def _get_sample(self, table_name: str, columns: list[str]) -> list[dict[str, Any]]:
         col_names = ", ".join(f'"{c}"' for c in columns)
         cursor = self.connection.execute(
             f'SELECT {col_names} FROM "{table_name}" '

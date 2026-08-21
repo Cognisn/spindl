@@ -53,7 +53,7 @@ class SpoolerListSpoolsTool(BaseTool):
             "to see all available spools\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             self._spooler.require_initialised()
             result = await self._spooler.backend.list_spools(
@@ -85,7 +85,7 @@ class SpoolerListSpoolsTool(BaseTool):
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error("Unexpected error in spooler_list: %s", exc)
+            logger.exception("Unexpected error in spooler_list: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

@@ -46,10 +46,9 @@ class TestToolRegistry:
         assert meta[0]["category"] == "inventory"
         assert meta[0]["description"] == "List devices"
 
-    def test_get_tool_guide_resolves_placeholders(
-        self, registry, sample_tool
-    ):
+    def test_get_tool_guide_resolves_placeholders(self, registry, sample_tool):
         registry.register(sample_tool)
+
         # Also register spooler_query so the placeholder resolves
         class FakeSpoolerQuery(BaseTool):
             name = "spooler_query"
