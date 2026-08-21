@@ -28,7 +28,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install --require-hashes -r requirements/ci-${{ matrix.mcp-lock }}.txt
           pip install --no-deps -e .
 
@@ -55,7 +54,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install --require-hashes -r requirements/ci-mcp2.txt
           pip install --no-deps -e .
 
