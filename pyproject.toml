@@ -47,6 +47,7 @@ version = {file = "src/spindl/_version.txt"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 asyncio_mode = "auto"
 
 [tool.black]

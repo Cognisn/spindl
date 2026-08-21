@@ -28,8 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --require-hashes -r requirements/ci-${{ matrix.mcp-lock }}.txt
-          pip install --no-deps -e .
+          pip install --require-hashes --only-binary :all: -r requirements/ci-${{ matrix.mcp-lock }}.txt
 
       - name: Run tests
         run: pytest --cov=spindl --cov-report=xml -v --timeout=60
@@ -54,8 +53,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --require-hashes -r requirements/ci-mcp2.txt
-          pip install --no-deps -e .
+          pip install --require-hashes --only-binary :all: -r requirements/ci-mcp2.txt
 
       - name: Check formatting (black)
         run: black --check src/ tests/
