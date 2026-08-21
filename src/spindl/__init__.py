@@ -4,6 +4,7 @@ Provides hierarchical tool name prefixing, skills guide tools,
 and built-in response spooling for large data sets.
 """
 
+from spindl.auth import AuthConfig, current_identity
 from spindl.prefix import PrefixResolver
 from spindl.registry import ToolRegistry
 from spindl.responses.envelope import ResponseEnvelope, ResponseMetadata
@@ -16,6 +17,8 @@ __all__ = [
     "MCPServer",
     "BaseTool",
     "SpoolerConfig",
+    "AuthConfig",
+    "current_identity",
     "PrefixResolver",
     "ToolRegistry",
     "ResponseEnvelope",

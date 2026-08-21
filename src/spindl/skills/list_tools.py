@@ -37,20 +37,22 @@ class ListToolsTool(BaseTool):
             "*No parameters required.*\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             tools = self._registry.list_tools_metadata()
 
             # Group by category
-            categories: dict[str, list[dict]] = {}
+            categories: dict[str, list[dict[str, Any]]] = {}
             for tool in tools:
                 cat = tool["category"]
                 if cat not in categories:
                     categories[cat] = []
-                categories[cat].append({
-                    "name": tool["name"],
-                    "description": tool["description"],
-                })
+                categories[cat].append(
+                    {
+                        "name": tool["name"],
+                        "description": tool["description"],
+                    }
+                )
 
             return ResponseEnvelope(
                 success=True,
@@ -66,7 +68,7 @@ class ListToolsTool(BaseTool):
             ).to_dict()
 
         except Exception as exc:
-            logger.error("Error listing tools: %s", exc)
+            logger.exception("Error listing tools: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

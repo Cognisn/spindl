@@ -6,7 +6,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ class SpoolerQueryTool(BaseTool):
             default=None,
             description="Columns to return. Omit for all columns.",
         )
-        filters: Optional[list[dict]] = Field(
+        filters: Optional[list[dict[str, Any]]] = Field(
             default=None,
             description=(
                 "Filter conditions. Each dict has: column, operator "
@@ -118,16 +117,14 @@ class SpoolerQueryTool(BaseTool):
             "- @spooler_distinct -- unique value discovery\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
+            self._spooler.require_initialised()
 
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
-            )
-            result = engine.query(
+            result: dict[str, Any] = await self._spooler.backend.query(
                 spool_id=validated.spool_id,
+                scope=self._spooler.current_scope(),
                 columns=validated.columns,
                 filters=validated.filters,
                 sort_by=validated.sort_by,
@@ -145,9 +142,7 @@ class SpoolerQueryTool(BaseTool):
                         error_message=result["error"].get(
                             "message", "Unknown query error"
                         ),
-                        retry_eligible=result["error"].get(
-                            "recoverable", False
-                        ),
+                        retry_eligible=result["error"].get("recoverable", False),
                         suggestion=(
                             "Check the spool_id, column names, and "
                             "filter syntax. Use @spooler_list to see "
@@ -159,7 +154,7 @@ class SpoolerQueryTool(BaseTool):
             return result
 
         except RuntimeError as exc:
-            logger.error("Spooler not available: %s", exc)
+            logger.exception("Spooler not available: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="SPOOLER_UNAVAILABLE",
@@ -173,7 +168,7 @@ class SpoolerQueryTool(BaseTool):
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error("Unexpected error in spooler_query: %s", exc)
+            logger.exception("Unexpected error in spooler_query: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

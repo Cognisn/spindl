@@ -30,10 +30,7 @@ class TestPrefixResolver:
         with patch.dict(os.environ, {"SPINDL_INSTANCE_PREFIX": "prod"}):
             assert prefix_resolver.instance_prefix == "prod"
             assert prefix_resolver.full_prefix == "prod_test"
-            assert (
-                prefix_resolver.prefixed_name("my_tool")
-                == "prod_test_my_tool"
-            )
+            assert prefix_resolver.prefixed_name("my_tool") == "prod_test_my_tool"
 
     def test_instance_prefix_from_context(self, prefix_resolver):
         prefix_resolver.set_instance_prefix("staging")
@@ -44,9 +41,7 @@ class TestPrefixResolver:
             prefix_resolver.set_instance_prefix(None)
 
     def test_context_wins_over_env(self, prefix_resolver):
-        with patch.dict(
-            os.environ, {"SPINDL_INSTANCE_PREFIX": "prod"}
-        ):
+        with patch.dict(os.environ, {"SPINDL_INSTANCE_PREFIX": "prod"}):
             prefix_resolver.set_instance_prefix("staging")
             try:
                 assert prefix_resolver.instance_prefix == "staging"
@@ -85,8 +80,7 @@ class TestPlaceholderResolution:
         text = "Use @spooler_query to query. Call @get_devices first."
         resolved = prefix_resolver.resolve_placeholders(text)
         assert resolved == (
-            "Use test_spooler_query to query. "
-            "Call test_get_devices first."
+            "Use test_spooler_query to query. " "Call test_get_devices first."
         )
 
     def test_unknown_names_untouched(self, prefix_resolver):
@@ -114,9 +108,7 @@ class TestPlaceholderResolution:
 
 class TestStripPrefix:
     def test_strip_valid(self, prefix_resolver):
-        assert (
-            prefix_resolver.strip_prefix("test_my_tool") == "my_tool"
-        )
+        assert prefix_resolver.strip_prefix("test_my_tool") == "my_tool"
 
     def test_strip_wrong_prefix(self, prefix_resolver):
         assert prefix_resolver.strip_prefix("other_my_tool") is None
@@ -124,12 +116,7 @@ class TestStripPrefix:
     def test_strip_with_instance(self, prefix_resolver):
         prefix_resolver.set_instance_prefix("prod")
         try:
-            assert (
-                prefix_resolver.strip_prefix("prod_test_my_tool")
-                == "my_tool"
-            )
-            assert (
-                prefix_resolver.strip_prefix("test_my_tool") is None
-            )
+            assert prefix_resolver.strip_prefix("prod_test_my_tool") == "my_tool"
+            assert prefix_resolver.strip_prefix("test_my_tool") is None
         finally:
             prefix_resolver.set_instance_prefix(None)

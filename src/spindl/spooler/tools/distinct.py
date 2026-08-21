@@ -6,7 +6,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -17,8 +16,7 @@ class SpoolerDistinctTool(BaseTool):
 
     name = "spooler_distinct"
     description = (
-        "Get distinct values and frequency counts for a column "
-        "in spooled data"
+        "Get distinct values and frequency counts for a column in spooled data"
     )
     category = "spooler"
 
@@ -70,16 +68,14 @@ class SpoolerDistinctTool(BaseTool):
             "4. Use @spooler_aggregate for summary statistics\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             validated = self.InputModel(**params)
+            self._spooler.require_initialised()
 
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
-            )
-            result = engine.get_distinct_values(
+            result: dict[str, Any] = await self._spooler.backend.distinct(
                 spool_id=validated.spool_id,
+                scope=self._spooler.current_scope(),
                 column=validated.column,
                 limit=validated.limit,
             )
@@ -88,12 +84,8 @@ class SpoolerDistinctTool(BaseTool):
                 return StructuredError(
                     error=ErrorDetail(
                         error_code="DISTINCT_ERROR",
-                        error_message=result["error"].get(
-                            "message", "Unknown error"
-                        ),
-                        retry_eligible=result["error"].get(
-                            "recoverable", False
-                        ),
+                        error_message=result["error"].get("message", "Unknown error"),
+                        retry_eligible=result["error"].get("recoverable", False),
                         suggestion=(
                             "Check the spool_id and column name. "
                             "Use @spooler_list to see available "
@@ -105,21 +97,17 @@ class SpoolerDistinctTool(BaseTool):
             return result
 
         except RuntimeError as exc:
-            logger.error("Spooler not available: %s", exc)
+            logger.exception("Spooler not available: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="SPOOLER_UNAVAILABLE",
                     error_message=str(exc),
                     retry_eligible=False,
-                    suggestion=(
-                        "The response spooler is not initialised."
-                    ),
+                    suggestion=("The response spooler is not initialised."),
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error(
-                "Unexpected error in spooler_distinct: %s", exc
-            )
+            logger.exception("Unexpected error in spooler_distinct: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

@@ -5,7 +5,6 @@ from typing import Any
 
 from spindl.responses import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.spooler.query_engine import QueryEngine
 from spindl.tool import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -54,13 +53,12 @@ class SpoolerListSpoolsTool(BaseTool):
             "to see all available spools\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         try:
-            engine = QueryEngine(
-                self._spooler.get_connection(),
-                self._spooler.config,
+            self._spooler.require_initialised()
+            result = await self._spooler.backend.list_spools(
+                scope=self._spooler.current_scope()
             )
-            result = engine.list_spools()
 
             return ResponseEnvelope(
                 success=True,
@@ -73,7 +71,7 @@ class SpoolerListSpoolsTool(BaseTool):
             ).to_dict()
 
         except RuntimeError as exc:
-            logger.error("Spooler not available: %s", exc)
+            logger.exception("Spooler not available: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="SPOOLER_UNAVAILABLE",
@@ -87,7 +85,7 @@ class SpoolerListSpoolsTool(BaseTool):
                 ),
             ).to_dict()
         except Exception as exc:
-            logger.error("Unexpected error in spooler_list: %s", exc)
+            logger.exception("Unexpected error in spooler_list: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

@@ -8,6 +8,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Optional
 
 
 @dataclass
@@ -33,6 +34,15 @@ class SpoolerConfig:
         db_cleanup_on_exit: Whether to delete the database file when
                            the spooler is closed. Default True for
                            container deployments.
+        backend: A SpoolBackend to store spools in. Defaults to the
+                 SQLite backend built from db_path.
+        default_ttl_seconds: Lifetime applied to every spool when the
+                            caller does not pass one. None means spools
+                            do not expire.
+        scope_from_identity: When True (default), spools created during
+                            an authenticated request are scoped to the
+                            caller's subject so other callers cannot
+                            read them.
     """
 
     db_path: str = field(
@@ -42,35 +52,35 @@ class SpoolerConfig:
         )
     )
     max_inline_tokens: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_INLINE_TOKENS", "2000")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_INLINE_TOKENS", "2000"))
     )
     max_inline_items: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_INLINE_ITEMS", "10")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_INLINE_ITEMS", "10"))
     )
     default_page_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_DEFAULT_PAGE_SIZE", "20")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_DEFAULT_PAGE_SIZE", "20"))
     )
     max_page_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_MAX_PAGE_SIZE", "50")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_MAX_PAGE_SIZE", "50"))
     )
     summary_sample_size: int = field(
-        default_factory=lambda: int(
-            os.environ.get("SPOOLER_SUMMARY_SAMPLE_SIZE", "3")
-        )
+        default_factory=lambda: int(os.environ.get("SPOOLER_SUMMARY_SAMPLE_SIZE", "3"))
     )
     chars_per_token: int = 4
+    backend: Optional[Any] = None
+    default_ttl_seconds: Optional[int] = field(
+        default_factory=lambda: (
+            int(os.environ["SPOOLER_DEFAULT_TTL_SECONDS"])
+            if os.environ.get("SPOOLER_DEFAULT_TTL_SECONDS")
+            else None
+        )
+    )
+    scope_from_identity: bool = True
     db_cleanup_on_exit: bool = field(
         default_factory=lambda: os.environ.get(
             "SPOOLER_CLEANUP_ON_EXIT", "true"
-        ).lower() == "true"
+        ).lower()
+        == "true"
     )
 
     def estimate_tokens(self, text: str) -> int:
@@ -82,12 +92,11 @@ class SpoolerConfig:
         if self.max_page_size < 1:
             raise ValueError("max_page_size must be at least 1")
         if self.default_page_size > self.max_page_size:
-            raise ValueError(
-                "default_page_size cannot exceed max_page_size"
-            )
+            raise ValueError("default_page_size cannot exceed max_page_size")
         if self.max_inline_items < 0:
             raise ValueError("max_inline_items must be non-negative")
 
-        # Ensure the database directory exists
-        db_dir = Path(self.db_path).parent
-        db_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure the database directory exists for the default backend
+        if self.backend is None:
+            db_dir = Path(self.db_path).parent
+            db_dir.mkdir(parents=True, exist_ok=True)

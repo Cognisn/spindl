@@ -26,6 +26,6 @@ class ResponseEnvelope(BaseModel):
     data: Any = None
     metadata: ResponseMetadata | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the envelope to a dictionary for MCP response."""
         return self.model_dump(exclude_none=True)
