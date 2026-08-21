@@ -205,9 +205,10 @@ class TestAuthConfig:
         assert cfg.required_scopes == []
 
     def test_requires_at_least_one_authorization_server(self):
+        verifier = StaticVerifier()
         with pytest.raises(ValueError):
             AuthConfig(
-                token_verifier=StaticVerifier(),
+                token_verifier=verifier,
                 resource_server_url=RESOURCE_URL,
                 authorization_servers=[],
             )

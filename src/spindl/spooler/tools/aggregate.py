@@ -155,7 +155,7 @@ class SpoolerAggregateTool(BaseTool):
             return result
 
         except RuntimeError as exc:
-            logger.error("Spooler not available: %s", exc)
+            logger.exception("Spooler not available: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="SPOOLER_UNAVAILABLE",

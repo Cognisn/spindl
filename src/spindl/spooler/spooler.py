@@ -123,7 +123,7 @@ class ResponseSpooler:
         """
         if not self._initialised:
             raise RuntimeError(
-                "Spooler not initialised. " "Call spooler.initialise() first."
+                "Spooler not initialised. Call spooler.initialise() first."
             )
 
         # If the response itself is an array, wrap it

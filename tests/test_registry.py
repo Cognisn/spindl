@@ -30,8 +30,9 @@ class TestToolRegistry:
             description = "test"
             category = "test"
 
+        tool = NoName()
         with pytest.raises(ValueError, match="non-empty"):
-            registry.register(NoName())
+            registry.register(tool)
 
     def test_tool_count(self, registry, sample_tool):
         assert registry.tool_count == 0

@@ -133,10 +133,12 @@ class SQLiteSpoolBackend:
     # SQLite calls are local and fast, so these await nothing; they exist so
     # the SQLite backend satisfies the same contract as a network backend.
 
-    async def initialise(self) -> None:
+    async def initialise(
+        self,
+    ) -> None:  # NOSONAR - async protocol; SQLite needs no await
         self._sync_initialise()
 
-    async def cleanup(self) -> None:
+    async def cleanup(self) -> None:  # NOSONAR - async protocol; SQLite needs no await
         self._sync_cleanup()
 
     async def create_spool(  # NOSONAR - async protocol; SQLite needs no await
@@ -144,7 +146,9 @@ class SQLiteSpoolBackend:
     ) -> dict[str, Any]:
         return self._sync_create_spool(**kwargs)
 
-    async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
+    async def delete_spool(  # NOSONAR - async protocol; SQLite needs no await
+        self, spool_id: str, *, scope: Optional[str] = None
+    ) -> bool:
         return self._sync_delete_spool(spool_id, scope=scope)
 
     async def list_spools(  # NOSONAR - async protocol; SQLite needs no await
@@ -152,17 +156,17 @@ class SQLiteSpoolBackend:
     ) -> dict[str, Any]:
         return self._sync_list_spools(scope=scope)
 
-    async def query(
+    async def query(  # NOSONAR - async protocol; SQLite needs no await
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
     ) -> dict[str, Any]:
         return self._sync_query(spool_id, scope=scope, **kw)
 
-    async def aggregate(
+    async def aggregate(  # NOSONAR - async protocol; SQLite needs no await
         self, spool_id: str, *, scope: Optional[str] = None, **kw: Any
     ) -> dict[str, Any]:
         return self._sync_aggregate(spool_id, scope=scope, **kw)
 
-    async def distinct(
+    async def distinct(  # NOSONAR - async protocol; SQLite needs no await
         self,
         spool_id: str,
         column: str,

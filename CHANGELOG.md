@@ -50,7 +50,10 @@
   throughout, with black's `target-version` pinned
 - CI and the publish workflow install from hash-locked requirement files
   (`requirements/ci-mcp1.txt`, `ci-mcp2.txt`, `build.txt`, regenerated with
-  `scripts/lock-ci.sh`)
+  `scripts/lock-ci.sh`); `uv.lock` records the resolved development
+  environment for `uv sync`
+- Unexpected errors in tool handlers are logged with `logging.exception` so the
+  traceback is retained
 - `httpx` and `pytest-timeout` added to the `dev` extra (`mcp` 2.x no longer
   depends on `httpx`)
 - Documentation updated throughout to remove read-only and write-operation

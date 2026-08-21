@@ -68,7 +68,7 @@ class ListToolsTool(BaseTool):
             ).to_dict()
 
         except Exception as exc:
-            logger.error("Error listing tools: %s", exc)
+            logger.exception("Error listing tools: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

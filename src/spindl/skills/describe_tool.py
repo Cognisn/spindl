@@ -73,7 +73,7 @@ class DescribeToolTool(BaseTool):
             }
 
         except Exception as exc:
-            logger.error("Error describing tool: %s", exc)
+            logger.exception("Error describing tool: %s", exc)
             return StructuredError(
                 error=ErrorDetail(
                     error_code="INTERNAL_ERROR",

@@ -206,7 +206,7 @@ class MCPServer:
             return [TextContent(type="text", text=result_json)]
 
         except Exception as exc:
-            logger.error("Error executing tool '%s': %s", tool.name, exc)
+            logger.exception("Error executing tool '%s': %s", tool.name, exc)
             error = StructuredError(
                 error=ErrorDetail(
                     error_code="EXECUTION_ERROR",
@@ -260,7 +260,7 @@ class MCPServer:
                     result["metadata"] = metadata
         except Exception as exc:
             logger.warning(
-                "Spooling failed for tool '%s', returning original " "response: %s",
+                "Spooling failed for tool '%s', returning original response: %s",
                 tool.name,
                 exc,
             )

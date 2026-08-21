@@ -9,14 +9,14 @@ set -euo pipefail
 
 # Locate the version file at src/<project>/version.txt.
 version_file=$(find src -maxdepth 2 -name _version.txt -print -quit 2>/dev/null || true)
-if [ -z "${version_file}" ]; then
+if [[ -z "${version_file}" ]]; then
   echo "_version.txt not found under src/*/" >&2
   exit 1
 fi
 
 current=$(tr -d '[:space:]' < "${version_file}")
 
-if [ "$#" -eq 0 ]; then
+if [[ "$#" -eq 0 ]]; then
   echo "${current}"
   exit 0
 fi
@@ -28,7 +28,7 @@ printf '%s\n' "${new}" > "${version_file}"
 echo "_version.txt: ${current} -> ${new}"
 
 # Propagate to manifests that store the version literally.
-if [ -f package.json ]; then
+if [[ -f package.json ]]; then
   if command -v npm >/dev/null 2>&1; then
     npm version "${new}" --no-git-tag-version --allow-same-version >/dev/null
   else
@@ -42,7 +42,7 @@ fi
 
 # Roll CHANGELOG.md: promote [Unreleased] to a dated section for this version
 # and open a fresh [Unreleased] above it.
-if [ -f CHANGELOG.md ]; then
+if [[ -f CHANGELOG.md ]]; then
   if ! grep -q '^## \[Unreleased\]' CHANGELOG.md; then
     echo "warning: CHANGELOG.md has no [Unreleased] section, leaving it unchanged" >&2
   else
@@ -51,7 +51,7 @@ if [ -f CHANGELOG.md ]; then
       inblk && /^## / {exit}
       inblk {print}
     ' CHANGELOG.md | grep -Ev '^[[:space:]]*$|^###' || true)
-    if [ -z "${body}" ]; then
+    if [[ -z "${body}" ]]; then
       echo "warning: no entries under [Unreleased] to release" >&2
     fi
     awk -v ver="${new}" -v date="${today}" '
