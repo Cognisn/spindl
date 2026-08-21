@@ -133,12 +133,10 @@ class SQLiteSpoolBackend:
     # SQLite calls are local and fast, so these await nothing; they exist so
     # the SQLite backend satisfies the same contract as a network backend.
 
-    async def initialise(
-        self,
-    ) -> None:  # NOSONAR - async protocol; SQLite needs no await
+    async def initialise(self) -> None:  # NOSONAR - local SQLite; no await
         self._sync_initialise()
 
-    async def cleanup(self) -> None:  # NOSONAR - async protocol; SQLite needs no await
+    async def cleanup(self) -> None:  # NOSONAR - local SQLite; no await
         self._sync_cleanup()
 
     async def create_spool(  # NOSONAR - async protocol; SQLite needs no await
