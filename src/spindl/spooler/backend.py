@@ -72,7 +72,7 @@ class SpoolBackend(Protocol):
         spool_id: str,
         *,
         columns: Optional[list[str]] = None,
-        filters: Optional[dict[str, Any]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "asc",
         page: int = 1,
@@ -89,7 +89,7 @@ class SpoolBackend(Protocol):
         *,
         group_by: Optional[list[str]] = None,
         aggregates: Optional[list[dict[str, Any]]] = None,
-        filters: Optional[dict[str, Any]] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         sort_by: Optional[str] = None,
         sort_order: str = "desc",
         limit: Optional[int] = None,
@@ -105,9 +105,14 @@ class SpoolBackend(Protocol):
         column: str,
         *,
         limit: Optional[int] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         scope: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Return distinct values for ``column``, or ``{"error": {...}}``."""
+        """Return distinct values for ``column``, or ``{"error": {...}}``.
+
+        ``filters`` takes the same structure as :meth:`query`, so a
+        backend must narrow the records before computing uniqueness.
+        """
 
     async def delete_spool(self, spool_id: str, *, scope: Optional[str] = None) -> bool:
         """Remove a spool. Returns False if absent or not visible to ``scope``."""
@@ -170,9 +175,12 @@ class SQLiteSpoolBackend:
         column: str,
         *,
         limit: Optional[int] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         scope: Optional[str] = None,
     ) -> dict[str, Any]:
-        return self._sync_distinct(spool_id, column, limit=limit, scope=scope)
+        return self._sync_distinct(
+            spool_id, column, limit=limit, filters=filters, scope=scope
+        )
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -367,11 +375,16 @@ class SQLiteSpoolBackend:
         column: str,
         *,
         limit: Optional[int] = None,
+        filters: Optional[list[dict[str, Any]]] = None,
         scope: Optional[str] = None,
     ) -> dict[str, Any]:
         if self._visible_registry_row(spool_id, scope) is None:
             return _not_found(spool_id)
-        kwargs: dict[str, Any] = {"spool_id": spool_id, "column": column}
+        kwargs: dict[str, Any] = {
+            "spool_id": spool_id,
+            "column": column,
+            "filters": filters,
+        }
         if limit is not None:
             kwargs["limit"] = limit
         return self._engine().get_distinct_values(**kwargs)

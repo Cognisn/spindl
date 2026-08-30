@@ -68,7 +68,7 @@ class QueryDevices(BaseTool):
         )
 
     async def execute(self, **params) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
         # Use validated.query, validated.limit, validated.severity
         ...
 ```
@@ -77,6 +77,11 @@ The `InputModel` automatically:
 - Generates the MCP tool's JSON Schema (shown to the LLM)
 - Validates input at execution time
 - Provides default values for optional parameters
+
+`validate_input()` applies the model's field constraints and rejects any
+argument the model does not declare, raising `ToolInputError`. Calling
+`self.InputModel(**params)` directly still works, but skips the
+unknown-argument check.
 
 ### Tools Without Parameters
 
@@ -89,8 +94,75 @@ class ListAll(BaseTool):
     category = "inventory"
 
     async def execute(self, **params) -> dict:
+        self.validate_input(params)
         return {"success": True, "data": [...]}
 ```
+
+A tool with no `InputModel` accepts no arguments at all, so any argument
+passed to it is rejected.
+
+## Argument Validation
+
+Spindl tools reject arguments they do not declare. An unknown argument
+returns a structured error naming both the rejected keys and the accepted
+ones:
+
+```json
+{
+  "success": false,
+  "platform": "spindl",
+  "error": {
+    "error_code": "INVALID_ARGUMENTS",
+    "error_message": "Tool 'query_devices' does not accept the argument(s) 'sort_by'. They were not applied.",
+    "retry_eligible": true,
+    "suggestion": "Accepted parameters: limit, query, severity. Remove the rejected argument(s) and call the tool again, or use a tool that supports them."
+  }
+}
+```
+
+The check runs at the MCP boundary in `MCPServer._handle_call_tool`, before
+`execute()`, so a tool gets the protection whether or not it calls
+`validate_input()` itself. Calling `validate_input()` in `execute()` as well
+extends it to direct calls in tests and embedded use.
+
+This is a correctness measure, not tidiness. A model that generalises across
+a server's schema will eventually pass one tool's parameter to a sibling
+that does not accept it. Silently dropping it produces a plausible answer to
+a different question, which the model then reports as fact; an explicit
+error is recovered from in one turn.
+
+### Opting Out
+
+A tool that deliberately takes free-form arguments can turn the check off:
+
+```python
+class Passthrough(BaseTool):
+    name = "passthrough"
+    description = "Forward arbitrary arguments to an upstream API"
+    category = "integration"
+    reject_unknown_arguments = False
+```
+
+This is the exception. Prefer declaring the parameters.
+
+### Handling the Error
+
+`validate_input()` raises `ToolInputError`, which renders itself as the
+structured error above:
+
+```python
+from spindl import ToolInputError
+
+async def execute(self, **params) -> dict:
+    try:
+        validated = self.validate_input(params)
+    except ToolInputError as exc:
+        return exc.to_dict()
+    ...
+```
+
+Letting it propagate is also fine: the server catches it and returns the
+same payload.
 
 ## Writing Guides
 
@@ -316,7 +388,7 @@ class SearchCVEs(BaseTool):
         )
 
     async def execute(self, **params) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
         # Your search logic here
         cves = [
             {"cve_id": f"CVE-2024-{i}", "severity": "high", "score": 7.5}

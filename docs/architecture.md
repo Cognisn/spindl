@@ -92,6 +92,12 @@ Client sends: call_tool("secops_list_devices", {"limit": 50})
         └───────────┬───────────┘
                     │
         ┌───────────┴───────────┐
+        │ tool.check_arguments()│
+        │ reject undeclared     │
+        │ arguments             │
+        └───────────┬───────────┘
+                    │
+        ┌───────────┴───────────┐
         │ Validate input via    │
         │ tool.InputModel       │
         └───────────┬───────────┘
@@ -124,6 +130,22 @@ await server._cleanup()
 - If `db_cleanup_on_exit=True`, the SQLite file is deleted
 
 ## Key Design Decisions
+
+### Undeclared arguments are rejected, not dropped
+
+`_handle_call_tool` calls `tool.check_arguments()` before `execute()`, so a
+tool is protected whether or not it validates its own parameters. The
+boundary is where the input schema was advertised, so it is where a
+mismatch belongs.
+
+The reason is specific to a model-facing API. A model generalises across a
+server's schema and will pass a sibling tool's parameter sooner or later.
+Dropping it silently yields a correct-looking answer to a different
+question, which the model reports as fact; an explicit `INVALID_ARGUMENTS`
+error naming the accepted parameters is recovered from in one turn. Tools
+that genuinely take free-form arguments set
+`reject_unknown_arguments = False`.
+
 
 ### Tools are stored by bare name
 

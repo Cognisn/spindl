@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-30
+
+### Added
+- `spooler_distinct` accepts `filters`, using the same structure and
+  operators as `spooler_query` and `spooler_aggregate`, so uniqueness can be
+  asked of a subset rather than only of the whole spool. The response echoes
+  `filters_applied` (#15)
+- `BaseTool.validate_input()` and `BaseTool.accepted_arguments()`, and the
+  `ToolInputError` exception, exported from `spindl`
+
+### Changed
+- Tools now reject arguments they do not declare instead of discarding them.
+  An unknown argument returns a structured `INVALID_ARGUMENTS` error naming
+  both the rejected keys and the accepted ones. The check runs at the MCP
+  boundary, so a tool is covered whether or not it validates its own
+  parameters. A tool that deliberately takes free-form arguments sets
+  `reject_unknown_arguments = False` (#16)
+
+  Silent discard is a correctness hazard for a model-facing API rather than
+  a wart: the caller believes the constraint was applied and presents
+  dataset-wide results as a filtered answer.
+- `InputModel` field violations return `INVALID_ARGUMENTS` with the offending
+  field named, rather than the previous `INTERNAL_ERROR`
+- `SpoolBackend.distinct()` takes a `filters` keyword argument. Backends
+  outside this repository must accept it; the spooler tool always passes it
+- `SpoolBackend.query()` and `aggregate()` annotate `filters` as
+  `list[dict[str, Any]]`, matching what the tools have always passed
+- `sample/` reformatted with black and isort, and the CI lint step widened to
+  cover it. It had drifted because CI only checked `src/` and `tests/`
+
 ## [0.2.0] - 2026-08-21
 
 ### Added

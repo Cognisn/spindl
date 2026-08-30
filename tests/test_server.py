@@ -138,3 +138,48 @@ class TestMCPServerToolCalls:
         assert "demo_spooler_query" in data["metadata"]["guidance"]
 
         await server._cleanup()
+
+
+class TestMCPServerArgumentValidation:
+    """Unknown arguments are rejected at the MCP boundary.
+
+    An adopter tool that never validates its own parameters still gets
+    the protection, because the boundary is where the input schema was
+    advertised in the first place.
+    """
+
+    async def _call(self, tool, arguments):
+        import json
+
+        server = MCPServer(prefix="demo")
+        server.register(tool)
+        await server._setup()
+        results = await server._handle_call_tool(f"demo_{tool.name}", arguments)
+        return json.loads(results[0].text)
+
+    @pytest.mark.asyncio
+    async def test_unknown_argument_is_rejected(self, sample_tool):
+        data = await self._call(sample_tool, {"limit": 10, "filters": []})
+        assert data["success"] is False
+        assert data["error"]["error_code"] == "INVALID_ARGUMENTS"
+        assert "filters" in data["error"]["error_message"]
+        assert "limit" in data["error"]["suggestion"]
+
+    @pytest.mark.asyncio
+    async def test_known_arguments_still_pass(self, sample_tool):
+        data = await self._call(sample_tool, {"limit": 10})
+        assert data["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_opted_out_tool_keeps_unknown_arguments(self):
+        class Lenient(BaseTool):
+            name = "lenient"
+            description = "Accepts anything"
+            category = "demo"
+            reject_unknown_arguments = False
+
+            async def execute(self, **params):
+                return {"success": True, "seen": sorted(params)}
+
+        data = await self._call(Lenient(), {"anything": 1})
+        assert data["seen"] == ["anything"]

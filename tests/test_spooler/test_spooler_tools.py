@@ -179,3 +179,114 @@ class TestSpoolerDistinct:
         result = await tool.execute(spool_id="any", column="severity")
         assert result["success"] is False
         assert result["error"]["error_code"] == "SPOOLER_UNAVAILABLE"
+
+
+class TestSpoolerDistinctFilters:
+    @pytest.mark.asyncio
+    async def test_filters_narrow_the_distinct_values(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(
+            spool_id=spool_id,
+            column="severity",
+            filters=[{"column": "vendor", "operator": "eq", "value": "Apache"}],
+        )
+        # Vendor and severity cycle together over the same four-record period,
+        # so every Apache record carries exactly one severity.
+        assert result["total_distinct"] == 1
+        assert result["distinct_values"][0]["value"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_filters_are_echoed_back(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        filters = [{"column": "status", "operator": "eq", "value": "open"}]
+        result = await tool.execute(
+            spool_id=spool_id, column="severity", filters=filters
+        )
+        assert result["filters_applied"] == filters
+
+    @pytest.mark.asyncio
+    async def test_omitting_filters_returns_every_value(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(spool_id=spool_id, column="severity")
+        assert result["total_distinct"] == 4
+        assert result["filters_applied"] == []
+
+    @pytest.mark.asyncio
+    async def test_filter_on_unknown_column_is_a_structured_error(
+        self, spooler_with_data
+    ):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(
+            spool_id=spool_id,
+            column="severity",
+            filters=[{"column": "nonexistent", "operator": "eq", "value": "x"}],
+        )
+        assert result["success"] is False
+        assert result["error"]["error_code"] == "DISTINCT_ERROR"
+
+    @pytest.mark.asyncio
+    async def test_invalid_operator_is_a_structured_error(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(
+            spool_id=spool_id,
+            column="severity",
+            filters=[{"column": "vendor", "operator": "regex", "value": "x"}],
+        )
+        assert result["success"] is False
+        assert result["error"]["error_code"] == "DISTINCT_ERROR"
+
+    def test_guide_documents_filter_support(self, spooler):
+        guide = SpoolerDistinctTool(spooler=spooler).guide()
+        assert "filters" in guide
+
+
+class TestSpoolerToolsRejectUnknownArguments:
+    """Regression cover for the silent-discard hazard."""
+
+    @pytest.mark.asyncio
+    async def test_distinct_rejects_an_unsupported_argument(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(
+            spool_id=spool_id, column="severity", group_by=["vendor"]
+        )
+        assert result["success"] is False
+        assert result["error"]["error_code"] == "INVALID_ARGUMENTS"
+        assert "group_by" in result["error"]["error_message"]
+        assert "filters" in result["error"]["suggestion"]
+
+    @pytest.mark.asyncio
+    async def test_query_rejects_an_unsupported_argument(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerQueryTool(spooler=spooler)
+        result = await tool.execute(spool_id=spool_id, group_by=["vendor"])
+        assert result["error"]["error_code"] == "INVALID_ARGUMENTS"
+
+    @pytest.mark.asyncio
+    async def test_aggregate_rejects_an_unsupported_argument(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerAggregateTool(spooler=spooler)
+        result = await tool.execute(spool_id=spool_id, search="apache")
+        assert result["error"]["error_code"] == "INVALID_ARGUMENTS"
+
+    @pytest.mark.asyncio
+    async def test_list_rejects_any_argument(self, spooler_with_data):
+        spooler, _ = spooler_with_data
+        tool = SpoolerListSpoolsTool(spooler=spooler)
+        result = await tool.execute(spool_id="anything")
+        assert result["error"]["error_code"] == "INVALID_ARGUMENTS"
+
+    @pytest.mark.asyncio
+    async def test_out_of_range_value_is_an_argument_error_not_internal(
+        self, spooler_with_data
+    ):
+        spooler, spool_id = spooler_with_data
+        tool = SpoolerDistinctTool(spooler=spooler)
+        result = await tool.execute(spool_id=spool_id, column="severity", limit=9000)
+        assert result["error"]["error_code"] == "INVALID_ARGUMENTS"
+        assert result["error"]["retry_eligible"] is True

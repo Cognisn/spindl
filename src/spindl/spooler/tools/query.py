@@ -6,7 +6,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class SpoolerQueryTool(BaseTool):
 
     async def execute(self, **params: Any) -> dict[str, Any]:
         try:
-            validated = self.InputModel(**params)
+            validated = self.validate_input(params)
             self._spooler.require_initialised()
 
             result: dict[str, Any] = await self._spooler.backend.query(
@@ -153,6 +153,8 @@ class SpoolerQueryTool(BaseTool):
 
             return result
 
+        except ToolInputError as exc:
+            return exc.to_dict()
         except RuntimeError as exc:
             logger.exception("Spooler not available: %s", exc)
             return StructuredError(

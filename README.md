@@ -68,7 +68,7 @@ class ListDevices(BaseTool):
         )
 
     async def execute(self, **params) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
         # Your API logic here
         devices = [{"id": i, "name": f"device-{i}"} for i in range(validated.limit)]
         return {"success": True, "data": devices}
@@ -225,7 +225,7 @@ class SearchVulns(BaseTool):
         )
 
     async def execute(self, **params) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
         # Your search logic here
         results = [...]
         return {"success": True, "data": {"results": results}}
@@ -241,6 +241,19 @@ class SearchVulns(BaseTool):
 | `spooler_array_paths` | `list[str] \| None` | `None` | Dot-notation paths to arrays to spool |
 | `spooler_auto_detect` | `bool` | `False` | Auto-detect large arrays in response |
 | `InputModel` | `type[BaseModel] \| None` | `None` | Pydantic model for input validation |
+| `reject_unknown_arguments` | `bool` | `True` | Reject arguments not declared by `InputModel` |
+
+### Argument Validation
+
+Tools reject arguments they do not declare. An unknown argument returns a
+structured `INVALID_ARGUMENTS` error naming both the rejected keys and the
+accepted ones, rather than a success built from the remaining arguments.
+
+This is a correctness measure for a model-facing API. A model that
+generalises across a server's schema will eventually pass one tool's
+parameter to a sibling that does not accept it; silently dropping it
+produces a plausible answer to a different question, which the model then
+reports as fact. See [Building Tools](docs/building-tools.md#argument-validation).
 
 ### Spooler Opt-In
 
@@ -299,7 +312,7 @@ All settings can also be configured via environment variables:
 | `{prefix}_spooler_list` | List all available spooled data sets |
 | `{prefix}_spooler_query` | Filter, sort, paginate, search records |
 | `{prefix}_spooler_aggregate` | Group-by with count/sum/avg/min/max |
-| `{prefix}_spooler_distinct` | Unique values and frequency counts |
+| `{prefix}_spooler_distinct` | Unique values and frequency counts, optionally filtered |
 
 ## Skills Guide
 
@@ -427,8 +440,11 @@ class MyTool(BaseTool):
     spooler_array_paths: list[str] | None = None
     spooler_auto_detect: bool = False
     InputModel: type[BaseModel] | None = None
+    reject_unknown_arguments: bool = True
 
     def guide(self) -> str: ...           # Usage guide with @placeholders
+    def accepted_arguments(self) -> list[str]: ...  # Declared argument names
+    def validate_input(self, params) -> BaseModel | None: ...  # Raises ToolInputError
     async def execute(self, **params) -> dict: ...  # Tool logic
 ```
 

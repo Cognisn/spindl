@@ -18,31 +18,42 @@ OS_DEBIAN_12 = "Debian 12"
 
 # Fake device inventory data
 DEVICES = [
-    {"id": f"DEV-{i:04d}", "hostname": f"srv-{i:04d}.corp.local",
-     "os": os, "status": status, "ip": f"10.0.{i // 256}.{i % 256}",
-     "location": loc, "owner": owner, "cpu_cores": cores, "ram_gb": ram}
-    for i, (os, status, loc, owner, cores, ram) in enumerate([
-        (OS_UBUNTU_22, "online", "us-east-1", "platform-team", 8, 32),
-        (OS_WIN_2022, "online", "us-east-1", "infra-team", 16, 64),
-        (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
-        (OS_UBUNTU_22, "degraded", "eu-west-1", "platform-team", 8, 32),
-        (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
-        (OS_WIN_2019, "offline", "us-east-1", "legacy-team", 4, 16),
-        (OS_UBUNTU_20, "online", "ap-south-1", "platform-team", 8, 32),
-        (OS_RHEL_8, "online", "eu-west-1", "data-team", 64, 256),
-        (OS_UBUNTU_22, "online", "us-west-2", "eng-team", 8, 32),
-        (OS_WIN_2022, "degraded", "us-east-1", "infra-team", 16, 64),
-        (OS_DEBIAN_12, "online", "ap-south-1", "platform-team", 4, 16),
-        (OS_UBUNTU_22, "online", "eu-west-1", "eng-team", 8, 32),
-        (OS_RHEL_9, "offline", "us-east-1", "data-team", 32, 128),
-        (OS_WIN_2022, "online", "us-west-2", "infra-team", 16, 64),
-        (OS_UBUNTU_22, "online", "ap-south-1", "platform-team", 8, 32),
-        (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
-        (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
-        (OS_UBUNTU_22, "degraded", "us-east-1", "platform-team", 8, 32),
-        (OS_WIN_2022, "online", "eu-west-1", "infra-team", 16, 64),
-        (OS_UBUNTU_20, "online", "us-west-2", "eng-team", 8, 32),
-    ], start=0)
+    {
+        "id": f"DEV-{i:04d}",
+        "hostname": f"srv-{i:04d}.corp.local",
+        "os": os,
+        "status": status,
+        "ip": f"10.0.{i // 256}.{i % 256}",
+        "location": loc,
+        "owner": owner,
+        "cpu_cores": cores,
+        "ram_gb": ram,
+    }
+    for i, (os, status, loc, owner, cores, ram) in enumerate(
+        [
+            (OS_UBUNTU_22, "online", "us-east-1", "platform-team", 8, 32),
+            (OS_WIN_2022, "online", "us-east-1", "infra-team", 16, 64),
+            (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
+            (OS_UBUNTU_22, "degraded", "eu-west-1", "platform-team", 8, 32),
+            (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
+            (OS_WIN_2019, "offline", "us-east-1", "legacy-team", 4, 16),
+            (OS_UBUNTU_20, "online", "ap-south-1", "platform-team", 8, 32),
+            (OS_RHEL_8, "online", "eu-west-1", "data-team", 64, 256),
+            (OS_UBUNTU_22, "online", "us-west-2", "eng-team", 8, 32),
+            (OS_WIN_2022, "degraded", "us-east-1", "infra-team", 16, 64),
+            (OS_DEBIAN_12, "online", "ap-south-1", "platform-team", 4, 16),
+            (OS_UBUNTU_22, "online", "eu-west-1", "eng-team", 8, 32),
+            (OS_RHEL_9, "offline", "us-east-1", "data-team", 32, 128),
+            (OS_WIN_2022, "online", "us-west-2", "infra-team", 16, 64),
+            (OS_UBUNTU_22, "online", "ap-south-1", "platform-team", 8, 32),
+            (OS_MACOS_14, "online", "us-west-2", "eng-team", 10, 16),
+            (OS_RHEL_9, "online", "eu-west-1", "data-team", 32, 128),
+            (OS_UBUNTU_22, "degraded", "us-east-1", "platform-team", 8, 32),
+            (OS_WIN_2022, "online", "eu-west-1", "infra-team", 16, 64),
+            (OS_UBUNTU_20, "online", "us-west-2", "eng-team", 8, 32),
+        ],
+        start=0,
+    )
 ]
 
 
@@ -52,7 +63,7 @@ class GetDevicesTool(BaseTool):
     name = "get_devices"
     description = "List devices in the inventory with optional filtering"
     category = "inventory"
-    spooler_auto_detect = True      # let the spooler find arrays automatically
+    spooler_auto_detect = True  # let the spooler find arrays automatically
 
     class InputModel(BaseModel):
         status: Optional[str] = Field(
@@ -93,7 +104,7 @@ class GetDevicesTool(BaseTool):
         )
 
     async def execute(self, **params: Any) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
 
         results = DEVICES[:]
 

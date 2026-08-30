@@ -17,7 +17,7 @@ from spindl.registry import ToolRegistry
 from spindl.responses.errors import ErrorDetail, StructuredError
 from spindl.spooler.config import SpoolerConfig
 from spindl.spooler.spooler import ResponseSpooler
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +193,10 @@ class MCPServer:
         params = dict(arguments) if arguments else {}
 
         try:
+            # Reject arguments the tool never declared, rather than
+            # dropping them silently and returning a result the caller
+            # believes was constrained by them.
+            tool.check_arguments(params)
             result = await tool.execute(**params)
 
             # Apply response spooling if tool opted in
@@ -204,6 +208,10 @@ class MCPServer:
             result_json = self._prefix_resolver.resolve_placeholders(result_json)
 
             return [TextContent(type="text", text=result_json)]
+
+        except ToolInputError as exc:
+            logger.info("Rejected arguments for tool '%s': %s", tool.name, exc)
+            return [TextContent(type="text", text=json.dumps(exc.to_dict()))]
 
         except Exception as exc:
             logger.exception("Error executing tool '%s': %s", tool.name, exc)

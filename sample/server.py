@@ -25,10 +25,10 @@ import logging
 import os
 import tempfile
 
-from spindl import MCPServer, SpoolerConfig
-
 from tools.get_devices import GetDevicesTool
 from tools.get_vulnerabilities import GetVulnerabilitiesTool
+
+from spindl import MCPServer, SpoolerConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,24 +49,22 @@ def build_server() -> MCPServer:
         server_name="sample-inventory",
     )
 
-    server.register_all([
-        GetDevicesTool(),
-        GetVulnerabilitiesTool(),
-    ])
+    server.register_all(
+        [
+            GetDevicesTool(),
+            GetVulnerabilitiesTool(),
+        ]
+    )
 
     return server
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Sample spindl MCP server"
-    )
+    parser = argparse.ArgumentParser(description="Sample spindl MCP server")
     parser.add_argument(
         "--http", action="store_true", help="Use HTTP streamable transport"
     )
-    parser.add_argument(
-        "--sse", action="store_true", help="Use SSE transport"
-    )
+    parser.add_argument("--sse", action="store_true", help="Use SSE transport")
     parser.add_argument(
         "--port", type=int, default=8000, help="Port for HTTP/SSE (default: 8000)"
     )

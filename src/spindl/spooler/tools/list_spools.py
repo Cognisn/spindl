@@ -5,7 +5,7 @@ from typing import Any
 
 from spindl.responses import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,7 @@ class SpoolerListSpoolsTool(BaseTool):
 
     async def execute(self, **params: Any) -> dict[str, Any]:
         try:
+            self.validate_input(params)
             self._spooler.require_initialised()
             result = await self._spooler.backend.list_spools(
                 scope=self._spooler.current_scope()
@@ -70,6 +71,8 @@ class SpoolerListSpoolsTool(BaseTool):
                 ),
             ).to_dict()
 
+        except ToolInputError as exc:
+            return exc.to_dict()
         except RuntimeError as exc:
             logger.exception("Spooler not available: %s", exc)
             return StructuredError(
