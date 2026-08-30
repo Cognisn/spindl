@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0a1] - 2026-08-30
+
 ### Added
 - `spooler_distinct` accepts `filters`, using the same structure and
   operators as `spooler_query` and `spooler_aggregate`, so uniqueness can be
