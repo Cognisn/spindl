@@ -56,10 +56,10 @@ jobs:
           pip install --require-hashes --only-binary :all: -r requirements/ci-mcp2.txt
 
       - name: Check formatting (black)
-        run: black --check src/ tests/
+        run: black --check src/ tests/ sample/
 
       - name: Check imports (isort)
-        run: isort --check-only src/ tests/
+        run: isort --check-only src/ tests/ sample/
 
       - name: Type checking (mypy)
         run: mypy src/spindl

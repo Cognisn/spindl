@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- `sample/` reformatted with black and isort, and the CI lint step widened to
+  cover it. It had drifted because CI only checked `src/` and `tests/`
+
 ## [0.3.0a1] - 2026-08-30
 
 ### Added

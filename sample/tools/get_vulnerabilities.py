@@ -49,7 +49,7 @@ class GetVulnerabilitiesTool(BaseTool):
     name = "get_vulnerabilities"
     description = "Retrieve vulnerability findings across devices"
     category = "security"
-    spooler_array_paths = ["vulnerabilities"]   # explicit path declaration
+    spooler_array_paths = ["vulnerabilities"]  # explicit path declaration
 
     class InputModel(BaseModel):
         device_id: Optional[str] = Field(
