@@ -181,3 +181,43 @@ class TestQueryEngineDistinct:
             spool_id=spool_id, column="cve_id", limit=500
         )
         assert result["total_distinct"] == 50
+
+
+class TestDistinctFilters:
+    async def test_filters_narrow_the_result(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        engine = QueryEngine(spooler.get_connection(), spooler.config)
+        result = engine.get_distinct_values(
+            spool_id=spool_id,
+            column="severity",
+            filters=[{"column": "vendor", "operator": "in", "value": ["Apache"]}],
+        )
+        assert [v["value"] for v in result["distinct_values"]] == ["high"]
+
+    async def test_counts_reflect_the_filtered_subset(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        engine = QueryEngine(spooler.get_connection(), spooler.config)
+        unfiltered = engine.get_distinct_values(spool_id=spool_id, column="status")
+        filtered = engine.get_distinct_values(
+            spool_id=spool_id,
+            column="status",
+            filters=[{"column": "vendor", "operator": "eq", "value": "Apache"}],
+        )
+        total = {v["value"]: v["count"] for v in unfiltered["distinct_values"]}
+        subset = {v["value"] for v in filtered["distinct_values"]}
+        assert subset
+        for value in subset:
+            assert total[value] > 0
+        assert sum(v["count"] for v in filtered["distinct_values"]) < sum(
+            total.values()
+        )
+
+    async def test_invalid_filter_column_is_an_error(self, spooler_with_data):
+        spooler, spool_id = spooler_with_data
+        engine = QueryEngine(spooler.get_connection(), spooler.config)
+        result = engine.get_distinct_values(
+            spool_id=spool_id,
+            column="severity",
+            filters=[{"column": "; DROP TABLE x", "operator": "eq", "value": 1}],
+        )
+        assert "error" in result

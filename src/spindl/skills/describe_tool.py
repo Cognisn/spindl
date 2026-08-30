@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class DescribeToolTool(BaseTool):
 
     async def execute(self, **params: Any) -> dict[str, Any]:
         try:
-            validated = self.InputModel(**params)
+            validated = self.validate_input(params)
 
             guide_text = self._registry.get_tool_guide(validated.tool_name)
             if guide_text is None:
@@ -72,6 +72,8 @@ class DescribeToolTool(BaseTool):
                 "guide": guide_text,
             }
 
+        except ToolInputError as exc:
+            return exc.to_dict()
         except Exception as exc:
             logger.exception("Error describing tool: %s", exc)
             return StructuredError(

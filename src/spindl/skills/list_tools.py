@@ -9,7 +9,7 @@ from typing import Any
 
 from spindl.responses import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ class ListToolsTool(BaseTool):
 
     async def execute(self, **params: Any) -> dict[str, Any]:
         try:
+            self.validate_input(params)
             tools = self._registry.list_tools_metadata()
 
             # Group by category
@@ -67,6 +68,8 @@ class ListToolsTool(BaseTool):
                 ),
             ).to_dict()
 
+        except ToolInputError as exc:
+            return exc.to_dict()
         except Exception as exc:
             logger.exception("Error listing tools: %s", exc)
             return StructuredError(

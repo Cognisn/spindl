@@ -11,11 +11,12 @@ from spindl.responses.envelope import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
 from spindl.server import MCPServer
 from spindl.spooler.config import SpoolerConfig
-from spindl.tool import BaseTool
+from spindl.tool import BaseTool, ToolInputError
 
 __all__ = [
     "MCPServer",
     "BaseTool",
+    "ToolInputError",
     "SpoolerConfig",
     "AuthConfig",
     "current_identity",

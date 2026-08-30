@@ -247,8 +247,15 @@ class QueryEngine:
         spool_id: str,
         column: str,
         limit: int = 50,
+        filters: Optional[list[dict[str, Any]]] = None,
     ) -> dict[str, Any]:
-        """Get distinct values for a column with frequency counts."""
+        """Get distinct values for a column with frequency counts.
+
+        ``filters`` uses the same structure and operators as
+        :meth:`query` and :meth:`aggregate`, so uniqueness can be asked
+        of a subset ("which severities does this vendor have") rather
+        than only of the whole spool.
+        """
         registry = self._get_spool_registry(spool_id)
         if not registry:
             return self._error(f"Spool '{spool_id}' not found.")
@@ -261,14 +268,20 @@ class QueryEngine:
                 f"Invalid column '{column}'. Valid columns: {valid_columns}"
             )
 
+        where_clause, where_params = self._build_where(filters, valid_columns)
+        if isinstance(where_clause, dict):
+            return where_clause
+
         limit = min(max(1, limit), 500)
+        where_sql = f"WHERE {where_clause} " if where_clause else ""
 
         cursor = self.db.execute(
             f'SELECT "{column}", COUNT(*) as count '
             f'FROM "{table_name}" '
+            f"{where_sql}"
             f'GROUP BY "{column}" '
             f"ORDER BY count DESC LIMIT ?",
-            [limit],
+            [*where_params, limit],
         )
         rows = cursor.fetchall()
 
@@ -277,6 +290,7 @@ class QueryEngine:
             "column": column,
             "distinct_values": [{"value": row[0], "count": row[1]} for row in rows],
             "total_distinct": len(rows),
+            "filters_applied": filters or [],
         }
 
     # ------------------------------------------------------------------
