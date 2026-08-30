@@ -2,11 +2,7 @@
 
 ## [Unreleased]
 
-### Changed
-- `sample/` reformatted with black and isort, and the CI lint step widened to
-  cover it. It had drifted because CI only checked `src/` and `tests/`
-
-## [0.3.0a1] - 2026-08-30
+## [0.3.0] - 2026-08-30
 
 ### Added
 - `spooler_distinct` accepts `filters`, using the same structure and
@@ -33,6 +29,8 @@
   outside this repository must accept it; the spooler tool always passes it
 - `SpoolBackend.query()` and `aggregate()` annotate `filters` as
   `list[dict[str, Any]]`, matching what the tools have always passed
+- `sample/` reformatted with black and isort, and the CI lint step widened to
+  cover it. It had drifted because CI only checked `src/` and `tests/`
 
 ## [0.2.0] - 2026-08-21
 
