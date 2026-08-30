@@ -228,6 +228,49 @@ Unique values and frequency counts for a column.
 
 Returns values sorted by frequency (most common first).
 
+`filters` takes the same structure and operators as `spooler_query`, so
+uniqueness can be asked of a subset rather than the whole spool:
+
+```json
+{
+  "spool_id": "a1b2c3d4e5f6",
+  "column": "severity",
+  "filters": [{"column": "vendor", "operator": "eq", "value": "Apache"}]
+}
+```
+
+The response echoes `filters_applied`, so the scope of the answer is
+explicit rather than inferred.
+
+## Argument Validation
+
+Every spindl tool rejects arguments it does not declare. Calling
+`spooler_distinct` with a `group_by` it never accepted returns a
+structured error naming both the rejected key and the accepted ones,
+rather than a success built from the remaining arguments:
+
+```json
+{
+  "success": false,
+  "platform": "spindl",
+  "error": {
+    "error_code": "INVALID_ARGUMENTS",
+    "error_message": "Tool 'spooler_distinct' does not accept the argument(s) 'group_by'. They were not applied.",
+    "retry_eligible": true,
+    "suggestion": "Accepted parameters: column, filters, limit, spool_id. Remove the rejected argument(s) and call the tool again, or use a tool that supports them."
+  }
+}
+```
+
+This matters more for a model-facing API than a human-facing one. A model
+that generalises across a server's schema will pass a sibling tool's
+parameter sooner or later; if the parameter is silently dropped, the model
+believes the constraint was applied and presents dataset-wide results as a
+filtered answer. An explicit error is recovered from in one turn.
+
+See [Building Tools](building-tools.md#argument-validation) for how this
+applies to tools you write.
+
 ## Storage Backends
 
 Storage sits behind the `SpoolBackend` protocol (`spindl.spooler.backend`).

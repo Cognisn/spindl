@@ -93,7 +93,7 @@ class GetDevicesTool(BaseTool):
         )
 
     async def execute(self, **params: Any) -> dict:
-        validated = self.InputModel(**params)
+        validated = self.validate_input(params)
 
         results = DEVICES[:]
 
