@@ -145,7 +145,12 @@ With `auth` set:
 - Requests whose token lacks a required scope receive `403`.
 - The RFC 9728 protected-resource metadata document is served at
   `/.well-known/oauth-protected-resource` followed by the resource path (for
-  the example above, `/.well-known/oauth-protected-resource/mcp`).
+  the example above, `/.well-known/oauth-protected-resource/mcp`). Its
+  `resource` and `authorization_servers` values are exactly the strings
+  configured, with no trailing slash added, so they can be compared as strings
+  with the authorisation server's own metadata.
+
+To show different callers different tools, see [Tool Visibility](visibility.md).
 
 ### Reading the caller's identity in a tool
 

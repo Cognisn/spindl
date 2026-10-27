@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 from spindl.auth import AuthConfig
 from spindl.prefix import PrefixResolver
-from spindl.registry import ToolRegistry
+from spindl.registry import ToolRegistry, ToolVisibility
 from spindl.responses.errors import ErrorDetail, StructuredError
 from spindl.spooler.config import SpoolerConfig
 from spindl.spooler.spooler import ResponseSpooler
@@ -41,6 +41,7 @@ class MCPServer:
         spooler: Optional[SpoolerConfig] = None,
         server_name: Optional[str] = None,
         auth: Optional[AuthConfig] = None,
+        tool_visibility: Optional[ToolVisibility] = None,
     ) -> None:
         """Initialise the MCP server.
 
@@ -52,9 +53,14 @@ class MCPServer:
             server_name: MCP server name. Defaults to the prefix.
             auth: AuthConfig to require bearer-token authentication on
                 the HTTP and SSE transports. stdio is unaffected.
+            tool_visibility: Optional per-request hook deciding whether a
+                tool is visible to the caller (see ``docs/visibility.md``).
+                It governs ``tools/list``, ``tools/call`` and the skills
+                guide tools alike; a hidden tool is answered exactly as an
+                unknown one. With no hook every tool is visible.
         """
         self._prefix_resolver = PrefixResolver(prefix)
-        self._registry = ToolRegistry(self._prefix_resolver)
+        self._registry = ToolRegistry(self._prefix_resolver, tool_visibility)
         self._server_name = server_name or prefix
         self._auth = auth
         self._spooler: Optional[ResponseSpooler] = None
