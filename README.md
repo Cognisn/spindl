@@ -380,6 +380,14 @@ For streaming connections. Requires `pip install cognisn-spindl[http]`.
 asyncio.run(server.run_sse(host="0.0.0.0", port=8000))
 ```
 
+## Tool Visibility
+
+A server can hide tools from some callers per request with a `tool_visibility`
+hook, which receives the verified identity and the tool. A hidden tool is left
+out of `tools/list` and `{prefix}_list_tools`, and is answered exactly as an
+unknown tool by `tools/call` and `{prefix}_describe_tool`. See
+[docs/visibility.md](docs/visibility.md).
+
 ## Response Types
 
 Spindl includes self-contained response types for consistent tool output:
@@ -417,6 +425,8 @@ MCPServer(
     prefix: str,                         # Mandatory server prefix
     spooler: SpoolerConfig | None,       # Enable response spooling
     server_name: str | None = None,      # MCP server name (defaults to prefix)
+    auth: AuthConfig | None = None,      # Bearer-token auth for HTTP and SSE
+    tool_visibility: ToolVisibility | None = None,  # Per-request tool visibility
 )
 ```
 

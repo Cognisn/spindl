@@ -10,6 +10,7 @@ the caller's identity to tools through a per-request context accessor.
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional, Protocol
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from mcp.server.auth.provider import AccessToken
@@ -112,16 +113,42 @@ def protect(app: Any, config: AuthConfig) -> Any:
 
 
 def metadata_routes(config: AuthConfig) -> list[Any]:
-    """Routes serving the RFC 9728 protected-resource metadata document."""
-    from mcp.server.auth.routes import create_protected_resource_routes
-    from pydantic import AnyHttpUrl
+    """Routes serving the RFC 9728 protected-resource metadata document.
 
-    return create_protected_resource_routes(
-        resource_url=AnyHttpUrl(config.resource_server_url),
+    ``resource`` and ``authorization_servers`` are served exactly as
+    configured. Clients compare them as strings (the issuer in particular
+    must match the authorisation server's own metadata), so they are not
+    passed through URL normalisation, which would add a trailing slash.
+    """
+    from mcp.server.auth.routes import cors_middleware
+    from mcp.shared.auth import ProtectedResourceMetadata
+    from pydantic import AnyHttpUrl
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, Response
+    from starlette.routing import Route
+
+    # Validated through the SDK model, then the configured strings restored.
+    model = ProtectedResourceMetadata(
+        resource=AnyHttpUrl(config.resource_server_url),
         authorization_servers=[AnyHttpUrl(u) for u in config.authorization_servers],
         scopes_supported=config.scopes_supported,
         resource_name=config.resource_name,
     )
+    document = model.model_dump(mode="json", exclude_none=True)
+    document["resource"] = config.resource_server_url
+    document["authorization_servers"] = list(config.authorization_servers)
+
+    async def handle(request: Request) -> Response:
+        return JSONResponse(document, headers={"Cache-Control": "public, max-age=3600"})
+
+    path = urlsplit(_metadata_url(config)).path
+    return [
+        Route(
+            path,
+            endpoint=cors_middleware(handle, ["GET", "OPTIONS"]),
+            methods=["GET", "OPTIONS"],
+        )
+    ]
 
 
 def _metadata_url(config: AuthConfig) -> str:

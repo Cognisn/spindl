@@ -6,7 +6,7 @@ and built-in response spooling for large data sets.
 
 from spindl.auth import AuthConfig, current_identity
 from spindl.prefix import PrefixResolver
-from spindl.registry import ToolRegistry
+from spindl.registry import ToolRegistry, ToolVisibility
 from spindl.responses.envelope import ResponseEnvelope, ResponseMetadata
 from spindl.responses.errors import ErrorDetail, StructuredError
 from spindl.server import MCPServer
@@ -22,6 +22,7 @@ __all__ = [
     "current_identity",
     "PrefixResolver",
     "ToolRegistry",
+    "ToolVisibility",
     "ResponseEnvelope",
     "ResponseMetadata",
     "StructuredError",

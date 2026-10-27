@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+### Added
+- Per-request tool visibility: `MCPServer(tool_visibility=...)` takes a hook
+  that receives the verified identity for the request (or `None` when
+  authentication is off) and a tool, and returns whether the tool is visible.
+  It governs `tools/list`, `tools/call` and the `list_tools` and
+  `describe_tool` skills tools from one place in `ToolRegistry`. A hidden tool
+  is answered exactly as an unknown tool, with no hint that it exists. A hook
+  that raises hides the tool and logs a warning. With no hook, behaviour is
+  unchanged. Documented in `docs/visibility.md`
+- `ToolRegistry.set_visibility()` and `ToolRegistry.is_visible()`, and the
+  `ToolVisibility` type
+
+### Fixed
+- The RFC 9728 protected-resource metadata document now carries `resource`
+  and `authorization_servers` exactly as configured. Previously each
+  authorisation server URL passed through pydantic's `AnyHttpUrl`, which added
+  a trailing slash, so `https://auth.example` was served as
+  `https://auth.example/` and no longer matched that server's `issuer`
+
 ## [0.3.0] - 2026-08-30
 
 ### Added

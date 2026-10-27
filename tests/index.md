@@ -11,6 +11,7 @@ Index of the tests in this folder. Keep it current as tests are added, changed, 
 | `test_server.py` | `MCPServer`: tool registration, auto-registered skills and spooler tools, request handling |
 | `test_tool.py` | `BaseTool`: `InputModel` validation, `execute` and `guide` contracts, spooler attributes |
 | `test_tool_validation.py` | `BaseTool` strict argument validation: `accepted_arguments`, unknown-argument rejection, `ToolInputError` payloads, the `reject_unknown_arguments` opt-out |
+| `test_visibility.py` | The `tool_visibility` hook: hidden tools absent from `tools/list` and `list_tools`, calls and `describe_tool` answered exactly as unknown tools, per-request decisions under concurrency, `None` identity without auth, failing closed, spooler tools, no-hook behaviour; exact protected-resource metadata strings |
 | `test_auth.py` | `AuthConfig`, `protect`, RFC 9728 metadata routes, `current_identity`, and the mountable HTTP and SSE transports |
 | `test_spooler/test_config.py` | `SpoolerConfig` defaults, validation, and token estimation |
 | `test_spooler/test_spooler.py` | `ResponseSpooler`: initialisation, array auto-detection, spooling thresholds, summary guidance, cleanup |
