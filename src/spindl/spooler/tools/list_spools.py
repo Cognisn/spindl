@@ -21,6 +21,7 @@ class SpoolerListSpoolsTool(BaseTool):
     destructive = False
     idempotent = True
     open_world = False
+    requires_reach = False
 
     def __init__(self, spooler: Any) -> None:
         self._spooler = spooler

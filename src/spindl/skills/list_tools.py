@@ -25,6 +25,7 @@ class ListToolsTool(BaseTool):
     destructive = False
     idempotent = True
     open_world = False
+    requires_reach = False
 
     def __init__(self, registry: Any) -> None:
         self._registry = registry
@@ -45,7 +46,7 @@ class ListToolsTool(BaseTool):
     async def execute(self, **params: Any) -> dict[str, Any]:
         try:
             self.validate_input(params)
-            tools = self._registry.list_tools_metadata()
+            tools = await self._registry.tools_metadata()
 
             # Group by category
             categories: dict[str, list[dict[str, Any]]] = {}

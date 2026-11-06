@@ -25,6 +25,7 @@ class SpoolerDistinctTool(BaseTool):
     destructive = False
     idempotent = True
     open_world = False
+    requires_reach = False
 
     class InputModel(BaseModel):
         spool_id: str = Field(

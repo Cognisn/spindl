@@ -3,6 +3,13 @@
 Provides the top-level MCPServer class that wires together the
 PrefixResolver, ToolRegistry, MCP SDK Server, and optional
 ResponseSpooler. Supports stdio, HTTP streamable, and SSE transports.
+
+Every ``tools/call`` passes three gates before tool code runs, in order:
+tool access (the authenticator's ``authorise``), reach (refused when an
+authenticator is configured, the tool requires reach and the credential
+carries none) and argument checking. Tool access and reach are separate
+controls: being allowed to call a tool never limits what it touches, so
+the tool applies ``self.context.reach`` itself.
 """
 
 import json
@@ -11,7 +18,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Optional
 
-from spindl.auth import AuthConfig
+from spindl.auth import AuthConfig, Authenticator, Identity, ToolAction, ToolContext
+from spindl.auth._context import (
+    current_identity,
+    reset_tool_context,
+    set_tool_context,
+)
+from spindl.auth.adapters import TokenVerifierAuthenticator, ToolVisibilityAuthoriser
 from spindl.prefix import PrefixResolver
 from spindl.registry import ToolRegistry, ToolVisibility
 from spindl.responses.errors import ErrorDetail, StructuredError
@@ -62,18 +75,59 @@ class MCPServer:
                 If provided, the 4 spooler query tools are
                 auto-registered.
             server_name: MCP server name. Defaults to the prefix.
-            auth: AuthConfig to require bearer-token authentication on
-                the HTTP and SSE transports. stdio is unaffected.
-            tool_visibility: Optional per-request hook deciding whether a
-                tool is visible to the caller (see ``docs/visibility.md``).
-                It governs ``tools/list``, ``tools/call`` and the skills
-                guide tools alike; a hidden tool is answered exactly as an
-                unknown one. With no hook every tool is visible.
+            auth: AuthConfig to require authentication on the HTTP and SSE
+                transports. stdio is unaffected. With
+                ``AuthConfig(authenticator=...)`` the authenticator decides
+                tool access for ``tools/list``, ``tools/call`` and the skills
+                guide tools alike, and every tool requires reach unless it
+                sets ``requires_reach = False``.
+            tool_visibility: Deprecated 0.4.0 per-request hook deciding
+                whether a tool is visible to the caller. It is wrapped in an
+                adapter with 0.4.0 behaviour exactly and logs one
+                deprecation warning. Cannot be combined with an
+                ``authenticator``; decide access in its ``authorise``.
+
+        Raises:
+            ValueError: ``tool_visibility`` given with an ``authenticator``.
         """
+        if (
+            tool_visibility is not None
+            and auth is not None
+            and auth.authenticator is not None
+        ):
+            raise ValueError(
+                "MCPServer takes tool_visibility or an AuthConfig authenticator, "
+                "not both. Decide tool access in the authenticator's authorise()."
+            )
+        if tool_visibility is not None:
+            logger.warning(
+                "MCPServer(tool_visibility=...) is deprecated and will be "
+                "removed in a future release. Decide tool access in "
+                "spindl.auth.Authenticator.authorise()."
+            )
         self._prefix_resolver = PrefixResolver(prefix)
-        self._registry = ToolRegistry(self._prefix_resolver, tool_visibility)
+        self._registry = ToolRegistry(self._prefix_resolver)
         self._server_name = server_name or prefix
         self._auth = auth
+        self._authenticator: Optional[Authenticator] = None
+        self._legacy_access = False
+        if auth is not None and auth.authenticator is not None:
+            self._authenticator = auth.authenticator
+        elif auth is not None and auth.token_verifier is not None:
+            self._authenticator = TokenVerifierAuthenticator(
+                auth.token_verifier, tool_visibility
+            )
+            self._legacy_access = True
+        elif tool_visibility is not None:
+            self._authenticator = ToolVisibilityAuthoriser(tool_visibility)
+            self._legacy_access = True
+        # Reach is required only when an Authenticator is configured
+        # directly; the 0.4.0 adapters and no authentication leave it off.
+        self._reach_required = (
+            self._authenticator is not None and not self._legacy_access
+        )
+        if self._authenticator is not None:
+            self._registry.set_access(self._check_access)
         self._spooler: Optional[ResponseSpooler] = None
         self._spooler_config = spooler
         self._mcp_server: Any = None
@@ -143,6 +197,156 @@ class MCPServer:
         self._registry.register(ListToolsTool(registry=self._registry))
         self._registry.register(DescribeToolTool(registry=self._registry))
 
+    @property
+    def _step_up(self) -> bool:
+        return self._auth is not None and self._auth.denial_mode == "step_up"
+
+    async def _authorise(
+        self, identity: Optional[Identity], tool: BaseTool, action: ToolAction
+    ) -> bool:
+        """Ask the authenticator whether ``identity`` may use ``tool``.
+
+        Tool access only: the answer never limits what the tool touches.
+        Fails closed: an authenticator that raises denies the tool.
+        """
+        authenticator: Any = self._authenticator
+        if authenticator is None:
+            return True
+        if identity is None and not self._legacy_access:
+            # No credential exists on this transport (stdio): there is no
+            # identity to authorise. Reach still fails closed in the call
+            # path, because there is no identity to carry it.
+            return True
+        try:
+            return bool(await authenticator.authorise(identity, tool, action))
+        except Exception as exc:
+            logger.warning(
+                "Authenticator authorise() raised %s for tool '%s'; denying it",
+                type(exc).__name__,
+                tool.name,
+            )
+            return False
+
+    async def _check_access(self, tool: BaseTool, action: ToolAction) -> bool:
+        """The registry's access check for the current request.
+
+        In ``denial_mode = "step_up"`` a tool denied only for lack of
+        permissions stays listed, so the client can see it and step up.
+        """
+        identity = current_identity()
+        if await self._authorise(identity, tool, action):
+            return True
+        return action == "list" and bool(self._step_up_scopes(identity, tool))
+
+    def _step_up_scopes(
+        self, identity: Optional[Identity], tool: BaseTool
+    ) -> list[str]:
+        """Permissions ``tool`` declares that ``identity`` lacks, in step-up mode."""
+        if not self._step_up or identity is None:
+            return []
+        return sorted(set(tool.permissions) - identity.tool_permissions)
+
+    async def _call_gate(self, tool: Optional[BaseTool]) -> tuple[str, list[str]]:
+        """Decide a call: ("allow", []), ("unknown", []) or ("step_up", missing)."""
+        if tool is None:
+            return "unknown", []
+        if await self._registry.allows(tool, "call"):
+            return "allow", []
+        missing = self._step_up_scopes(current_identity(), tool)
+        if missing:
+            return "step_up", missing
+        return "unknown", []
+
+    def _reach_refusal(self, tool: BaseTool) -> Optional[dict[str, Any]]:
+        """The structured refusal for a call lacking reach, or None to proceed."""
+        if not self._reach_required or tool.requires_reach is False:
+            return None
+        identity = current_identity()
+        if identity is not None and identity.reach is not None:
+            return None
+        return StructuredError(
+            error=ErrorDetail(
+                error_code="REACH_REQUIRED",
+                error_message=(
+                    f"Tool '{tool.name}' was not run: it requires reach (what a "
+                    f"call may touch), and this credential carries none. Tool "
+                    f"access was decided separately and does not grant reach."
+                ),
+                retry_eligible=False,
+                suggestion=(
+                    "Use a credential whose authenticator sets Identity.reach, "
+                    "or, for a tool that touches nothing caller-specific, set "
+                    "requires_reach = False on the tool class."
+                ),
+            ),
+        ).to_dict()
+
+    async def _step_up_gate(self, scope: Any, receive: Any, send: Any) -> Any:
+        """Answer a ``tools/call`` needing more permissions with ``403``.
+
+        Only in ``denial_mode = "step_up"``. Reads the request body, and when
+        it is a call to a tool the caller lacks permissions for, answers
+        ``403`` ``insufficient_scope`` naming them and returns None.
+        Otherwise returns a ``receive`` that replays the body.
+        """
+        if not self._step_up or scope.get("method") != "POST":
+            return receive
+        chunks: list[bytes] = []
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                break
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        body = b"".join(chunks)
+        name = _called_tool_name(body)
+        if name is not None:
+            decision, missing = await self._call_gate(self._registry.lookup(name))
+            if decision == "step_up":
+                from spindl.auth.http import send_auth_error
+
+                assert self._auth is not None
+                await send_auth_error(
+                    send,
+                    self._auth,
+                    403,
+                    "insufficient_scope",
+                    "The tool needs permissions this credential does not hold",
+                    scope=missing,
+                )
+                return None
+        replayed = False
+
+        async def replay() -> Any:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        return replay
+
+    def _protect(self, app: Any) -> Any:
+        """Wrap ``app`` in the authentication stack when auth is configured."""
+        if self._auth is None:
+            return app
+        from spindl import auth as _auth
+
+        return _auth.protect(app, self._auth, self._authenticator)
+
+    def _metadata_routes(self) -> list[Any]:
+        """The RFC 9728 metadata routes, or none when they are not served.
+
+        ``scopes_supported`` adds every permission a registered tool
+        declares to the configured scopes.
+        """
+        if self._auth is None or not self._auth.serve_metadata:
+            return []
+        from spindl import auth as _auth
+
+        return _auth.metadata_routes(self._auth, self._registry.declared_permissions)
+
     async def _on_list_tools(  # NOSONAR - the SDK requires a coroutine
         self,
         ctx: "ServerRequestContext[Any]",
@@ -151,7 +355,7 @@ class MCPServer:
         """Answer ``tools/list`` with the tools visible to this request."""
         from mcp.types import ListToolsResult
 
-        return ListToolsResult(tools=self._registry.get_mcp_tool_definitions())
+        return ListToolsResult(tools=await self._registry.tool_definitions())
 
     async def _on_call_tool(
         self,
@@ -167,11 +371,33 @@ class MCPServer:
     async def _handle_call_tool(
         self, name: str, arguments: dict[str, Any] | None
     ) -> list[Any]:
-        """Dispatch a tool call by wire name."""
+        """Dispatch a tool call by wire name.
+
+        Tool access is decided first (a denied tool is answered as unknown,
+        or, in step-up mode, as lacking permissions), then reach, then the
+        arguments; only then does tool code run.
+        """
         from mcp.types import TextContent
 
-        tool = self._registry.get_tool(name)
-        if tool is None:
+        tool = self._registry.lookup(name)
+        decision, missing = await self._call_gate(tool)
+        if decision == "step_up":
+            denied = StructuredError(
+                error=ErrorDetail(
+                    error_code="INSUFFICIENT_SCOPE",
+                    error_message=(
+                        f"Tool '{name}' needs permissions this credential does "
+                        f"not hold: {' '.join(missing)}"
+                    ),
+                    retry_eligible=False,
+                    suggestion=(
+                        "Obtain a credential granting these permissions and "
+                        "call the tool again."
+                    ),
+                ),
+            ).to_dict()
+            return [TextContent(type="text", text=json.dumps(denied))]
+        if tool is None or decision != "allow":
             error = StructuredError(
                 error=ErrorDetail(
                     error_code="TOOL_NOT_FOUND",
@@ -185,7 +411,27 @@ class MCPServer:
             ).to_dict()
             return [TextContent(type="text", text=json.dumps(error))]
 
+        refusal = self._reach_refusal(tool)
+        if refusal is not None:
+            return [TextContent(type="text", text=json.dumps(refusal))]
+
         params = dict(arguments) if arguments else {}
+        identity = current_identity()
+        context_token = set_tool_context(
+            ToolContext(
+                identity=identity,
+                reach=identity.reach if identity is not None else None,
+                instance_prefix=self._prefix_resolver.instance_prefix,
+            )
+        )
+        try:
+            return await self._run_tool(tool, params)
+        finally:
+            reset_tool_context(context_token)
+
+    async def _run_tool(self, tool: BaseTool, params: dict[str, Any]) -> list[Any]:
+        """Check the arguments, execute the tool and render its result."""
+        from mcp.types import TextContent
 
         try:
             # Reject arguments the tool never declared, rather than
@@ -310,13 +556,14 @@ class MCPServer:
 
         async def handle_mcp(scope: Scope, receive: Receive, send: Send) -> None:
             prefix_resolver.set_instance_prefix(_header(scope, "x-spindl-prefix"))
-            await session_manager.handle_request(scope, receive, send)
+            gated = await self._step_up_gate(scope, receive, send)
+            if gated is None:
+                return
+            await session_manager.handle_request(scope, gated, send)
 
         endpoint: Any = _AsgiEndpoint(handle_mcp)
         if self._auth is not None:
-            from spindl import auth as _auth
-
-            endpoint = _auth.protect(handle_mcp, self._auth)
+            endpoint = self._protect(handle_mcp)
         return endpoint
 
     @asynccontextmanager
@@ -350,11 +597,7 @@ class MCPServer:
         from starlette.routing import Route
 
         endpoint = await self.http_endpoint()
-        routes: list[Any] = []
-        if self._auth is not None and self._auth.serve_metadata:
-            from spindl import auth as _auth
-
-            routes.extend(_auth.metadata_routes(self._auth))
+        routes: list[Any] = self._metadata_routes()
         routes.append(Route(path, endpoint=endpoint, methods=["POST", "GET", "DELETE"]))
         return Starlette(routes=routes, lifespan=self.http_lifespan)
 
@@ -394,18 +637,17 @@ class MCPServer:
             # The SDK runs each request in the context of the POST that
             # carried it, so the prefix is read from that POST as well.
             prefix_resolver.set_instance_prefix(_header(scope, "x-spindl-prefix"))
-            await sse_transport.handle_post_message(scope, receive, send)
+            gated = await self._step_up_gate(scope, receive, send)
+            if gated is None:
+                return
+            await sse_transport.handle_post_message(scope, gated, send)
 
-        routes: list[Any] = []
+        routes: list[Any] = self._metadata_routes()
         sse_endpoint: Any = _AsgiEndpoint(handle_sse)
         messages_endpoint: Any = _AsgiEndpoint(handle_messages)
         if self._auth is not None:
-            from spindl import auth as _auth
-
-            sse_endpoint = _auth.protect(handle_sse, self._auth)
-            messages_endpoint = _auth.protect(handle_messages, self._auth)
-            if self._auth.serve_metadata:
-                routes.extend(_auth.metadata_routes(self._auth))
+            sse_endpoint = self._protect(handle_sse)
+            messages_endpoint = self._protect(handle_messages)
         routes.append(Route(sse_path, endpoint=sse_endpoint, methods=["GET"]))
         routes.append(
             Route(messages_path, endpoint=messages_endpoint, methods=["POST"])
@@ -464,6 +706,19 @@ class MCPServer:
         from spindl.wsgi import bridge_for
 
         return bridge_for(self)
+
+
+def _called_tool_name(body: bytes) -> Optional[str]:
+    """The tool a JSON-RPC ``tools/call`` body names, or None for anything else."""
+    try:
+        message = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(message, dict) or message.get("method") != "tools/call":
+        return None
+    params = message.get("params")
+    name = params.get("name") if isinstance(params, dict) else None
+    return name if isinstance(name, str) else None
 
 
 def _header(scope: Any, name: str) -> Optional[str]:
