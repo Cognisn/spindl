@@ -28,6 +28,8 @@ if TYPE_CHECKING:
         PaginatedRequestParams,
     )
 
+    from spindl.wsgi import WsgiBridge
+
 logger = logging.getLogger(__name__)
 
 
@@ -445,6 +447,23 @@ class MCPServer:
         """Clean up resources on shutdown."""
         if self._spooler:
             await self._spooler.cleanup_async()
+
+    def wsgi_app(self) -> "WsgiBridge":
+        """Return the HTTP streamable transport as a WSGI (PEP 3333) application.
+
+        Mount it in any WSGI application, or on Flask with
+        :func:`spindl.wsgi.init_app`. The bridge runs :meth:`http_endpoint`
+        and :meth:`http_lifespan` on an event loop in a background thread it
+        owns, so authentication, instance prefixing and tool visibility work
+        exactly as on the ASGI endpoint. Responses are JSON; Server-Sent
+        Events are not streamed. A server has one bridge: calling this again
+        returns the same one, and after :meth:`WsgiBridge.close` it raises
+        RuntimeError. Requires a2wsgi (install with:
+        pip install cognisn-spindl[wsgi]).
+        """
+        from spindl.wsgi import bridge_for
+
+        return bridge_for(self)
 
 
 def _header(scope: Any, name: str) -> Optional[str]:
