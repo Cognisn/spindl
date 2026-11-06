@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0a1] - 2026-11-05
+
 ### Changed
 - CI now also runs on pushes to workstream branches (`feat/**`, `fix/**`,
   `docs/**`, `refactor/**`, `chore/**`, `test/**`, `perf/**`, `build/**`,
