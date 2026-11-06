@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.5.0a2] - 2026-11-05
+
+### Changed
+- spindl now requires `mcp>=2.3,<3` and speaks MCP protocol revision
+  2026-07-28 on every transport, while still answering clients that use the
+  `initialize` handshake
+- `starlette` is declared as a direct dependency, at the floor `mcp` 2.3
+  requires
+- CI tests one hash-locked environment, `requirements/ci.txt`, on the newest
+  `mcp` 2.3.x
+
+### Removed
+- Support for the `mcp` 1.x SDK, its handler registration path and the `mcp1`
+  CI lock
+
+### Fixed
+- `X-Spindl-Prefix` now takes effect on the SSE transport, where `mcp` 2.x
+  handles each request in the context of its messages POST
+
 ## [0.5.0a1] - 2026-11-05
 
 ### Changed
