@@ -234,6 +234,105 @@ auth = AuthConfig(..., serve_metadata=False)
 The `401` challenge's `resource_metadata` URL derives from
 `resource_server_url`, so it keeps pointing at the document the gateway serves.
 
+## WSGI (Flask, Django and other WSGI servers)
+
+The HTTP streamable transport can also run inside a WSGI application. Install
+the `wsgi` extra, which brings in `a2wsgi`:
+
+```bash
+pip install cognisn-spindl[wsgi]
+```
+
+Without it, `server.wsgi_app()` raises `ImportError` naming that command.
+Importing `spindl` never needs `a2wsgi` or Flask.
+
+### Flask
+
+`spindl.wsgi.init_app()` mounts the server on a Flask application with
+Werkzeug's `DispatcherMiddleware`. Requests under the path go to Spindl and
+every other request reaches your Flask routes as before:
+
+```python
+from flask import Flask
+from spindl import MCPServer
+from spindl.wsgi import init_app
+
+server = MCPServer(prefix="secops")
+server.register(MyTool())
+
+app = Flask(__name__)
+init_app(app, server, path="/mcp")   # returns the bridge
+```
+
+`init_app()` refuses a second registration on the same application with
+`RuntimeError`. It imports Werkzeug only when called.
+
+### Any other WSGI application
+
+`server.wsgi_app()` returns a PEP 3333 application. Mount it wherever your
+framework mounts a WSGI application; it serves the MCP endpoint at its mount
+point (an empty or `/` `PATH_INFO`) and answers `404` below it:
+
+```python
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
+bridge = server.wsgi_app()
+application = DispatcherMiddleware(existing_wsgi_app, {"/mcp": bridge})
+```
+
+Calling `wsgi_app()` again returns the same bridge, so a server never runs two
+session managers.
+
+### Authentication, prefixing and visibility
+
+The bridge runs the same endpoint as `http_endpoint()`, so nothing changes:
+with `auth` set, an unauthenticated request receives `401` and a request
+lacking a scope receives `403`, each with its `WWW-Authenticate` challenge;
+`X-Spindl-Prefix` selects the instance prefix; the visibility hook applies to
+`tools/list` and `tools/call`.
+
+When `AuthConfig.serve_metadata` is set, the bridge also answers the RFC 9728
+document whenever the request's full path (`SCRIPT_NAME` plus `PATH_INFO`) is
+the document's path, `/.well-known/oauth-protected-resource` followed by the
+path of `resource_server_url`. `init_app()` routes that path to the bridge for
+you. With any other host, route it to the same bridge yourself, for example
+`DispatcherMiddleware(app, {"/mcp": bridge,
+"/.well-known/oauth-protected-resource/mcp": bridge})`, or set
+`serve_metadata=False` and publish the document elsewhere.
+
+### The background thread and its lifecycle
+
+The bridge owns one background thread, named `spindl-wsgi`, running an asyncio
+event loop. On that loop it enters `http_lifespan()` once, for the life of the
+bridge, and runs the endpoint for each request. A WSGI worker thread reads the
+request body, hands the request to the loop and waits for the complete
+response, so requests from many worker threads run concurrently on the loop.
+
+- The thread starts on the first request, or earlier with `bridge.start()`,
+  which returns once the lifespan is running.
+- `bridge.close(timeout=10.0)` stops it: requests in flight get up to
+  `timeout` seconds to finish, any still running are answered `503`, then the
+  lifespan exits, the server cleans up (the spooler, if configured) and the
+  thread is joined. `close()` is safe to call more than once.
+- After `close()`, calling the bridge raises `RuntimeError`, and so does
+  `server.wsgi_app()`, because a session manager runs only once. Build a new
+  `MCPServer` to serve again.
+- The thread is not a daemon thread, so it is never killed mid-request. An
+  exit hook closes every open bridge when the interpreter exits, so a process
+  that never calls `close()` still exits cleanly.
+- With a pre-forking server such as gunicorn, each worker process gets its own
+  bridge and thread. Create the bridge in the worker (the default, since the
+  thread starts on the first request), not in the master before forking.
+
+### Limits
+
+- Responses are JSON. The bridge offers no Server-Sent Events: `GET` on the
+  endpoint is answered `405` with `Allow: POST`. Use `build_sse_app()` under an
+  ASGI server if you need the SSE transport.
+- A response is returned to the WSGI server only when complete.
+- A client that disconnects while its request runs is not detected until the
+  response is written; the tool call runs to completion.
+
 ## Choosing a Transport
 
 | Transport | Clients | Scaling | Auth | Instance Prefix |
