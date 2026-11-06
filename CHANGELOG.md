@@ -2,7 +2,39 @@
 
 ## [Unreleased]
 
+## [0.5.0b1] - 2026-11-06
+
+Upgrading from 0.4: see [docs/upgrading-0.5.md](docs/upgrading-0.5.md) for
+the `mcp` 2.3 floor, the deprecated 0.4 authentication interfaces, tool
+annotations and the reach requirement that comes with an `Authenticator`.
+
+### Added
+- Documentation for 0.5: `docs/authentication.md` covers the
+  `Authenticator`, `Identity`, `Credentials` and `ToolContext`, the `401` and
+  `403` challenges, the `hide` and `step_up` denial modes, permissions and
+  `scopes_supported`, the reference API key, scope and JWT implementations,
+  and why tool access is not reach; `docs/annotations.md` covers tool
+  annotations, the start-up warning and the category in `_meta`;
+  `docs/upgrading-0.5.md` is a guide to upgrading from 0.4
+- Every Python example in `README.md` and `docs/` runs in CI, with checks of
+  what each example claims, so the documentation cannot drift from the API
+- The sample server declares annotations and permissions, authenticates with
+  `ApiKeyAuthenticator` and `ScopeAuthoriser` using demo keys generated at
+  start-up, applies the caller's reach in every tool, and can run mounted in
+  a Flask application. A test starts it over HTTP streamable and through
+  Flask
+
+### Changed
+- `README.md` and the transports, architecture, building tools, spooler,
+  prefix and skills guides describe 0.5, including the `wsgi` extra and WSGI
+  in the transport comparison. `docs/visibility.md` now points to the
+  authentication guide
+
 ### Fixed
+- The documentation no longer says the `mcp` 1.x SDK is supported, gives
+  Python 3.10 as the minimum, names the published package `cognisn-spindl` in
+  install commands, and states that SSE clients must send `X-Spindl-Prefix`
+  on the messages `POST`s as well as the `GET`
 - When uvicorn is missing, `run_http()` and `run_sse()` now say to install
   `cognisn-spindl[http]`, the published package name, rather than
   `spindl[http]`. The two docstrings say the same
