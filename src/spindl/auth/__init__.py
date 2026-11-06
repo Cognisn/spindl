@@ -31,6 +31,14 @@ from spindl.auth._types import (
     is_scope_token,
 )
 from spindl.auth.adapters import TokenVerifierAuthenticator, ToolVisibilityAuthoriser
+from spindl.auth.api_key import (
+    ApiKeyAuthenticator,
+    ApiKeyRecord,
+    ApiKeyStore,
+    InMemoryApiKeyStore,
+    generate_api_key,
+    hash_api_key,
+)
 from spindl.auth.config import AuthConfig
 from spindl.auth.http import (
     METADATA_PATH,
@@ -39,15 +47,22 @@ from spindl.auth.http import (
     metadata_url,
     protect,
 )
+from spindl.auth.scopes import Authoriser, ScopeAuthoriser
 
 __all__ = [
     "AccessTokenIdentity",
+    "ApiKeyAuthenticator",
+    "ApiKeyRecord",
+    "ApiKeyStore",
     "AuthConfig",
     "Authenticator",
+    "Authoriser",
     "Credentials",
     "DenialMode",
     "Identity",
+    "InMemoryApiKeyStore",
     "METADATA_PATH",
+    "ScopeAuthoriser",
     "TokenVerifier",
     "TokenVerifierAuthenticator",
     "ToolAction",
@@ -56,6 +71,8 @@ __all__ = [
     "_metadata_url",
     "current_identity",
     "current_tool_context",
+    "generate_api_key",
+    "hash_api_key",
     "is_scope_token",
     "metadata_routes",
     "metadata_url",
