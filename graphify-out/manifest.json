@@ -36,9 +36,9 @@
     "semantic_hash": "3f64d0cf18da33692ec57eeb59ee898d"
   },
   "pyproject.toml": {
-    "mtime": 1793932579.4885437,
-    "seen": 1793932935.3867328,
-    "ast_hash": "a0895961814a0bcbe3e18a5b84948670",
+    "mtime": 1793942042.5903304,
+    "seen": 1793942691.1891446,
+    "ast_hash": "d5b8f189f8bbe4b0fe9d77b9a5654ec2",
     "semantic_hash": ""
   },
   "sample/server.py": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1793939308.4363217,
-    "seen": 1793939503.308438,
-    "ast_hash": "946a527859d0bc8e5395bbe83ef471c9",
+    "mtime": 1793942409.6902795,
+    "seen": 1793942691.1894917,
+    "ast_hash": "bdfca07a2bd9e6e87466789c06f3adab",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "requirements/ci.txt": {
-    "mtime": 1793932579.501716,
-    "seen": 1793932935.3867328,
-    "ast_hash": "26b24153c5a759752eaf492c8206c05a",
+    "mtime": 1793942042.6010547,
+    "seen": 1793942691.1894917,
+    "ast_hash": "1ccfd0eb00d53f15dddf3b94730bafe0",
     "semantic_hash": ""
   },
   "sample/README.md": {
@@ -408,9 +408,9 @@
     "semantic_hash": ""
   },
   "src/spindl/_version.txt": {
-    "mtime": 1793939308.0724883,
-    "seen": 1793939503.308438,
-    "ast_hash": "38dd7b1c7e28998e3a97594a1feec0df",
+    "mtime": 1793942409.2536094,
+    "seen": 1793942691.1894917,
+    "ast_hash": "2cf960d4f387ed9e58b82b2be2a0f0cb",
     "semantic_hash": ""
   },
   "tests/index.md": {
@@ -420,9 +420,9 @@
     "semantic_hash": ""
   },
   "src/spindl/auth/__init__.py": {
-    "mtime": 1793939192.3241296,
-    "seen": 1793939503.308438,
-    "ast_hash": "74c8a5fc645dce200090076c8f0fc485",
+    "mtime": 1793942049.5336905,
+    "seen": 1793942691.1891446,
+    "ast_hash": "911c379c8b729ed2eedda2be201b1da1",
     "semantic_hash": ""
   },
   "src/spindl/auth/_context.py": {
@@ -465,6 +465,42 @@
     "mtime": 1793939192.390013,
     "seen": 1793939503.308438,
     "ast_hash": "3527e09435c23b5f2d55907e46c6fbf0",
+    "semantic_hash": ""
+  },
+  "src/spindl/auth/api_key.py": {
+    "mtime": 1793941593.8998442,
+    "seen": 1793942691.1891446,
+    "ast_hash": "2f3ca1980f896c4e8e7835aae36748ce",
+    "semantic_hash": ""
+  },
+  "src/spindl/auth/jwt.py": {
+    "mtime": 1793942042.6072743,
+    "seen": 1793942691.1891446,
+    "ast_hash": "6de592534dec280eab01c80123c03055",
+    "semantic_hash": ""
+  },
+  "src/spindl/auth/scopes.py": {
+    "mtime": 1793941593.9031332,
+    "seen": 1793942691.1891446,
+    "ast_hash": "c8ee99073223a75f7ce182b63e0ec87a",
+    "semantic_hash": ""
+  },
+  "tests/test_auth_api_key.py": {
+    "mtime": 1793941593.906355,
+    "seen": 1793942691.1894917,
+    "ast_hash": "fb3f39f93c2682135f3b5499dbd718fa",
+    "semantic_hash": ""
+  },
+  "tests/test_auth_jwt.py": {
+    "mtime": 1793942042.614355,
+    "seen": 1793942691.1894917,
+    "ast_hash": "4099c9c7d9ca3a7eb24055b07ee644d3",
+    "semantic_hash": ""
+  },
+  "tests/test_auth_scopes.py": {
+    "mtime": 1793941593.9103322,
+    "seen": 1793942691.1894917,
+    "ast_hash": "8e53c0866e0fefa6fff281b75a4631ff",
     "semantic_hash": ""
   }
 }
