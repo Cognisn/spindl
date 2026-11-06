@@ -30,7 +30,7 @@ from pydantic import BaseModel
 from werkzeug.serving import make_server as make_werkzeug_server
 
 import spindl
-from spindl.auth import AuthConfig, current_identity
+from spindl.auth import AuthConfig, Credentials, Identity, current_identity
 from spindl.server import MCPServer
 from spindl.tool import BaseTool
 from spindl.wsgi import WsgiBridge, init_app
@@ -782,3 +782,134 @@ class TestRealServer:
         bridge.close()
         assert not bridge_threads()
         assert loop is not None and loop.is_closed()
+
+
+# ---------------------------------------------------------------------------
+# The 0.5.0 Authenticator, tool access and reach through the bridge.
+# ---------------------------------------------------------------------------
+
+
+class KeyAuthenticator:
+    """Accepts fixed API keys; allows a tool when its permissions are held."""
+
+    identities = {
+        "alice-key": Identity(
+            subject="alice",
+            tool_permissions=frozenset({"read", "write"}),
+            reach={"tenants": ["t1"]},
+        ),
+        "bob-key": Identity(
+            subject="bob", tool_permissions=frozenset({"read"}), reach={"tenants": []}
+        ),
+        "carol-key": Identity(
+            subject="carol", tool_permissions=frozenset({"read", "write"})
+        ),
+    }
+
+    async def authenticate(self, credentials: Credentials) -> Identity | None:
+        return self.identities.get(credentials.headers.get("x-api-key", ""))
+
+    async def authorise(self, identity: Identity, tool: BaseTool, action: str) -> bool:
+        return set(tool.permissions) <= identity.tool_permissions
+
+
+class GuardedWriteTool(BaseTool):
+    name = "guarded_write"
+    description = "Needs the write permission and reach"
+    category = "records"
+    destructive = True
+    permissions = ["write"]
+
+    async def execute(self, **params: Any) -> dict[str, Any]:
+        context = self.context
+        return {"reach": context.reach if context else None}
+
+
+def make_authenticator_server(denial_mode: str = "hide") -> MCPServer:
+    srv = MCPServer(
+        prefix="test",
+        auth=AuthConfig(
+            authenticator=KeyAuthenticator(),
+            resource_server_url=RESOURCE_URL,
+            authorization_servers=[AUTH_SERVER_URL],
+            credential_headers=["X-API-Key"],
+            scopes_supported=["read"],
+            denial_mode=denial_mode,  # type: ignore[arg-type]
+        ),
+    )
+    srv.register(GuardedWriteTool())
+    return srv
+
+
+@pytest.fixture
+def authenticator_server() -> Iterator[MCPServer]:
+    srv = make_authenticator_server()
+    yield srv
+    bridge = getattr(srv, "_wsgi_bridge", None)
+    if bridge is not None:
+        bridge.close()
+
+
+@pytest.fixture
+def step_up_server() -> Iterator[MCPServer]:
+    srv = make_authenticator_server("step_up")
+    yield srv
+    bridge = getattr(srv, "_wsgi_bridge", None)
+    if bridge is not None:
+        bridge.close()
+
+
+def guarded_call(client: Any, key: str) -> Any:
+    return client.post(
+        "/mcp",
+        json=rpc("tools/call", {"name": "test_guarded_write", "arguments": {}}),
+        headers=rpc_headers("tools/call", "test_guarded_write", **{"X-API-Key": key}),
+    )
+
+
+class TestAuthenticatorThroughTheBridge:
+    def test_no_credential_gets_401_with_the_metadata_challenge(
+        self, authenticator_server
+    ):
+        client = make_flask_app(authenticator_server).test_client()
+        resp = client.post(
+            "/mcp", json=rpc("tools/list"), headers=rpc_headers("tools/list")
+        )
+        assert resp.status_code == 401
+        assert (
+            f'resource_metadata="http://localhost{METADATA_PATH}"'
+            in resp.headers["WWW-Authenticate"]
+        )
+
+    def test_authorise_filters_tools_list_and_hides_calls(self, authenticator_server):
+        client = make_flask_app(authenticator_server).test_client()
+        listed = client.post(
+            "/mcp",
+            json=rpc("tools/list"),
+            headers=rpc_headers("tools/list", **{"X-API-Key": "bob-key"}),
+        )
+        names = {t["name"] for t in listed.get_json()["result"]["tools"]}
+        called = guarded_call(client, "bob-key")
+        assert "test_guarded_write" not in names
+        assert called.status_code == 200
+        assert tool_text(called.get_json())["error"]["error_code"] == "TOOL_NOT_FOUND"
+
+    def test_step_up_answers_403_insufficient_scope(self, step_up_server):
+        client = make_flask_app(step_up_server).test_client()
+        resp = guarded_call(client, "bob-key")
+        assert resp.status_code == 403
+        challenge = resp.headers["WWW-Authenticate"]
+        assert 'error="insufficient_scope"' in challenge
+        assert 'scope="write"' in challenge
+
+    def test_reach_is_required_and_handed_to_the_tool(self, authenticator_server):
+        client = make_flask_app(authenticator_server).test_client()
+        refused = tool_text(guarded_call(client, "carol-key").get_json())
+        allowed = tool_text(guarded_call(client, "alice-key").get_json())
+        assert refused["error"]["error_code"] == "REACH_REQUIRED"
+        assert allowed == {"reach": {"tenants": ["t1"]}}
+
+    def test_metadata_advertises_tool_permissions(self, authenticator_server):
+        client = make_flask_app(authenticator_server).test_client()
+        document = client.get(METADATA_PATH).get_json()
+        assert document["scopes_supported"] == ["read", "write"]

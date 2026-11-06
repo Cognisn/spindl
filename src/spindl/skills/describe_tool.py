@@ -27,6 +27,7 @@ class DescribeToolTool(BaseTool):
     destructive = False
     idempotent = True
     open_world = False
+    requires_reach = False
 
     class InputModel(BaseModel):
         tool_name: str = Field(
@@ -55,7 +56,7 @@ class DescribeToolTool(BaseTool):
         try:
             validated = self.validate_input(params)
 
-            guide_text = self._registry.get_tool_guide(validated.tool_name)
+            guide_text = await self._registry.tool_guide(validated.tool_name)
             if guide_text is None:
                 return StructuredError(
                     error=ErrorDetail(

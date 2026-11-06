@@ -292,8 +292,9 @@ class WsgiBridge:
     async def _prepare(self) -> None:
         self._endpoint = await self._server.http_endpoint()
         auth = self._server._auth
-        if auth is not None and auth.serve_metadata:
-            self._metadata_route = _metadata_route(auth)
+        routes = self._server._metadata_routes()
+        if auth is not None and routes:
+            self._metadata_route = routes[0]
             self._metadata_path = _metadata_path(auth)
 
     async def _drain(self) -> None:
@@ -362,12 +363,6 @@ class WsgiBridge:
             )(scope, receive, send)
         else:
             await self._endpoint(scope, receive, send)
-
-
-def _metadata_route(auth: Any) -> Any:
-    from spindl import auth as _auth
-
-    return _auth.metadata_routes(auth)[0]
 
 
 def _metadata_path(auth: Any) -> str:

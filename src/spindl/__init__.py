@@ -4,7 +4,14 @@ Provides hierarchical tool name prefixing, skills guide tools,
 and built-in response spooling for large data sets.
 """
 
-from spindl.auth import AuthConfig, current_identity
+from spindl.auth import (
+    AuthConfig,
+    Authenticator,
+    Credentials,
+    Identity,
+    ToolContext,
+    current_identity,
+)
 from spindl.prefix import PrefixResolver
 from spindl.registry import ToolRegistry, ToolVisibility
 from spindl.responses.envelope import ResponseEnvelope, ResponseMetadata
@@ -19,6 +26,10 @@ __all__ = [
     "ToolInputError",
     "SpoolerConfig",
     "AuthConfig",
+    "Authenticator",
+    "Credentials",
+    "Identity",
+    "ToolContext",
     "current_identity",
     "PrefixResolver",
     "ToolRegistry",
