@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- When uvicorn is missing, `run_http()` and `run_sse()` now say to install
+  `cognisn-spindl[http]`, the published package name, rather than
+  `spindl[http]`. The two docstrings say the same
+
 ## [0.5.0a7] - 2026-11-05
 
 ### Added

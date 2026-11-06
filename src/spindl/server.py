@@ -658,7 +658,7 @@ class MCPServer:
     async def run_http(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Run the server on HTTP streamable transport.
 
-        Requires uvicorn (install with: pip install spindl[http]).
+        Requires uvicorn (install with: pip install cognisn-spindl[http]).
         """
         app = await self.build_http_app()
         await self._serve(app, host, port)
@@ -666,7 +666,7 @@ class MCPServer:
     async def run_sse(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Run the server on SSE transport.
 
-        Requires uvicorn (install with: pip install spindl[http]).
+        Requires uvicorn (install with: pip install cognisn-spindl[http]).
         """
         app = await self.build_sse_app()
         await self._serve(app, host, port)
@@ -677,7 +677,7 @@ class MCPServer:
         except ImportError:
             raise ImportError(
                 "uvicorn is required for HTTP and SSE transports. "
-                "Install with: pip install spindl[http]"
+                "Install with: pip install cognisn-spindl[http]"
             ) from None
 
         config = uvicorn.Config(app, host=host, port=port)
