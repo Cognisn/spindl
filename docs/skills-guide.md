@@ -14,7 +14,11 @@ MCP tool descriptions are sent to the LLM as part of the system prompt. Long des
 
 ### list_tools
 
-Lists all registered tools with their prefixed wire name, category, and description.
+Lists the tools the caller may use, grouped by category, with each tool's
+prefixed wire name, title, description, and its `read_only` and
+`destructive` annotations (`null` when undeclared). On a server with
+authentication, tools the caller may not use are left out (see
+[Authentication](authentication.md)).
 
 **Wire name:** `{prefix}_list_tools`
 
@@ -25,53 +29,108 @@ Lists all registered tools with their prefixed wire name, category, and descript
 ```json
 {
   "success": true,
+  "platform": "spindl",
   "data": {
-    "total_tools": 7,
+    "total_tools": 8,
     "categories": {
       "inventory": [
         {
           "name": "secops_list_devices",
-          "description": "List all monitored devices"
+          "title": "List devices",
+          "description": "List all monitored devices",
+          "read_only": true,
+          "destructive": false
         }
       ],
       "security": [
         {
           "name": "secops_search_vulns",
-          "description": "Search vulnerability database"
+          "title": "Search vulnerabilities",
+          "description": "Search vulnerability database",
+          "read_only": true,
+          "destructive": false
         }
       ],
       "skills": [
         {
-          "name": "secops_list_tools",
-          "description": "List all available tools with name, category, and description"
+          "name": "secops_describe_tool",
+          "title": "Describe tool",
+          "description": "Get detailed usage guide for a specific tool",
+          "read_only": true,
+          "destructive": false
         },
         {
-          "name": "secops_describe_tool",
-          "description": "Get detailed usage guide for a specific tool"
+          "name": "secops_list_tools",
+          "title": "List tools",
+          "description": "List all available tools with name, category, and description",
+          "read_only": true,
+          "destructive": false
         }
       ],
       "spooler": [
         {
-          "name": "secops_spooler_list",
-          "description": "List all available spooled data sets with their metadata"
-        },
-        {
-          "name": "secops_spooler_query",
-          "description": "Query spooled data with filtering, sorting, and pagination"
-        },
-        {
           "name": "secops_spooler_aggregate",
-          "description": "Aggregate spooled data with grouping and summary functions"
-        },
-        {
-          "name": "secops_spooler_distinct",
-          "description": "Get distinct values and frequency counts for a column in spooled data"
+          "title": "Aggregate spool",
+          "description": "Aggregate spooled data with grouping and summary functions",
+          "read_only": true,
+          "destructive": false
         }
       ]
     }
   }
 }
 ```
+
+The `spooler` category lists `spooler_distinct`, `spooler_list` and
+`spooler_query` in the same form; they are left out above for brevity.
+
+<!-- docs-test
+from typing import Any
+
+from spindl import BaseTool, MCPServer, SpoolerConfig
+
+
+class ListDevices(BaseTool):
+    name = "list_devices"
+    description = "List all monitored devices"
+    category = "inventory"
+    title = "List devices"
+    read_only = True
+    destructive = False
+
+    async def execute(self, **params: Any) -> dict[str, Any]:
+        return {"success": True, "data": []}
+
+
+class SearchVulns(ListDevices):
+    name = "search_vulns"
+    description = "Search vulnerability database"
+    category = "security"
+    title = "Search vulnerabilities"
+
+
+guide_server = MCPServer(prefix="secops", spooler=SpoolerConfig())
+guide_server.register_all([ListDevices(), SearchVulns()])
+async with docs_client(guide_server) as client:
+    _, listing = await client.call("secops_list_tools")
+assert listing["data"]["total_tools"] == 8
+assert listing["data"]["categories"]["inventory"] == [
+    {
+        "name": "secops_list_devices",
+        "title": "List devices",
+        "description": "List all monitored devices",
+        "read_only": True,
+        "destructive": False,
+    }
+]
+assert [t["name"] for t in listing["data"]["categories"]["skills"]] == [
+    "secops_describe_tool",
+    "secops_list_tools",
+]
+assert listing["data"]["categories"]["spooler"][0]["title"] == "Aggregate spool"
+assert len(listing["data"]["categories"]["spooler"]) == 4
+await guide_server._cleanup()
+-->
 
 ### describe_tool
 
@@ -108,6 +167,8 @@ Note how `@spooler_query` in the original guide text has been resolved to `secop
 Categories are declared per-tool via the `category` attribute:
 
 ```python
+from spindl import BaseTool
+
 class MyTool(BaseTool):
     category = "inventory"
 ```
@@ -157,6 +218,17 @@ def guide(self) -> str:
         "- @spooler_aggregate for grouping\n"
     )
 ```
+
+<!-- docs-test
+from spindl import PrefixResolver
+
+structure_resolver = PrefixResolver("secops")
+for known in ("tool_name", "spooler_query", "spooler_aggregate"):
+    structure_resolver.register_known_name(known)
+rendered = structure_resolver.resolve_placeholders(guide(None))
+assert rendered.startswith("# secops_tool_name\n")
+assert "- secops_spooler_query for filtering" in rendered
+-->
 
 ### Tips
 
