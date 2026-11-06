@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.5.0a6] - 2026-11-05
+
+### Added
+- `spindl.auth.api_key.ApiKeyAuthenticator`, a reference `Authenticator` for
+  API keys. It reads the key from a header (`X-API-Key` by default) or, when
+  `accept_bearer=True`, from `Authorization: Bearer`, hashes it with SHA-256,
+  looks the digest up in an `ApiKeyStore`, compares digests in constant time
+  and refuses expired and revoked keys. The plaintext key is never stored,
+  logged or shown. Pass `credential_headers=authenticator.credential_headers`
+  to `AuthConfig`
+- `ApiKeyRecord`, the `ApiKeyStore` protocol and `InMemoryApiKeyStore`, with
+  `generate_api_key(prefix)` (256 random bits from `secrets`) and
+  `hash_api_key(key)`. Keys must be random; never use a human-chosen password
+  as an API key
+- `spindl.auth.scopes.ScopeAuthoriser`, which allows a tool when the caller
+  holds every permission the tool declares (a tool declaring none is allowed
+  for any authenticated caller), and the `Authoriser` protocol it implements.
+  It composes into any authenticator, including
+  `ApiKeyAuthenticator(authoriser=ScopeAuthoriser())` and a product's own
+- These API key and authoriser names are also exported from `spindl.auth`
+
 ## [0.5.0a5] - 2026-11-05
 
 ### Added
