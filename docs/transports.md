@@ -2,6 +2,8 @@
 
 Spindl supports three MCP transport mechanisms. Your tools don't change -- only the `run_*()` method differs.
 
+Spindl requires the `mcp` SDK 2.3 or later (below 3.0) and speaks MCP protocol revision 2026-07-28 on every transport, while still answering clients that use the earlier `initialize` handshake.
+
 ## stdio
 
 Standard I/O transport. The server reads from stdin and writes to stdout.

@@ -471,8 +471,9 @@ resolver.set_instance_prefix("prod")        # Per-request override
 ## Requirements
 
 - Python >= 3.12
-- `mcp >= 1.25.0`
+- `mcp >= 2.3, < 3` (MCP protocol revision 2026-07-28)
 - `pydantic >= 2.0.0`
+- `starlette` (at the floor `mcp` 2.3 requires)
 - `uvicorn >= 0.30.0` (optional, for HTTP/SSE transports)
 
 ## License
