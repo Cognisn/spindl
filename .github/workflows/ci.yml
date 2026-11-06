@@ -27,9 +27,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        # Hash-locked environments for the oldest supported mcp 1.x and the
-        # first 2.x release; regenerate with scripts/lock-ci.sh.
-        mcp-lock: ["mcp1", "mcp2"]
 
     steps:
       - uses: actions/checkout@v5
@@ -39,15 +36,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # Hash-locked on the newest mcp 2.3.x; regenerate with scripts/lock-ci.sh.
       - name: Install dependencies
         run: |
-          pip install --require-hashes --only-binary :all: -r requirements/ci-${{ matrix.mcp-lock }}.txt
+          pip install --require-hashes --only-binary :all: -r requirements/ci.txt
 
       - name: Run tests
         run: pytest --cov=spindl --cov-report=xml -v --timeout=60
 
       - name: Upload coverage
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.mcp-lock == 'mcp1'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v5
         with:
           name: coverage-report
@@ -66,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --require-hashes --only-binary :all: -r requirements/ci-mcp2.txt
+          pip install --require-hashes --only-binary :all: -r requirements/ci.txt
 
       - name: Check formatting (black)
         run: black --check src/ tests/ sample/

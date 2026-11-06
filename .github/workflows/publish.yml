@@ -45,7 +45,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --require-hashes --only-binary :all: \
-            -r requirements/ci-mcp2.txt
+            -r requirements/ci.txt
 
       - name: Run tests
         run: pytest -v
