@@ -151,6 +151,18 @@ class PurgeTool(BaseTool):
         return {"purged": True}
 
 
+class ReviseTool(BaseTool):
+    name = "revise"
+    description = "Read and rewrite records"
+    category = "records"
+    destructive = True
+    permissions = ["read", "write"]
+
+    async def execute(self, **params: Any) -> dict[str, Any]:
+        EXECUTED.append(self.name)
+        return {"revised": True}
+
+
 class PingTool(BaseTool):
     name = "ping"
     description = "Touches nothing, so needs no reach"
@@ -676,6 +688,19 @@ class TestStepUp:
         assert f'resource_metadata="http://testserver{METADATA_PATH}"' in challenge
         assert several.status_code == 403
         assert 'scope="admin audit write"' in several.headers["www-authenticate"]
+        assert EXECUTED == []
+
+    async def test_the_challenge_names_only_the_permissions_lacking(self):
+        server = make_server(
+            make_auth(denial_mode="step_up"), tools=[ReviseTool(), PingTool()]
+        )
+        async with client_for(server) as client:
+            resp = await call_raw(client, "bob-key", "test_revise")
+        assert resp.status_code == 403
+        challenge = resp.headers["www-authenticate"]
+        assert 'scope="write"' in challenge
+        assert "read" not in challenge.split('scope="')[1].split('"')[0]
+        assert resp.json()["scope"] == "write"
         assert EXECUTED == []
 
     async def test_a_denial_for_another_reason_is_answered_as_unknown(self):
