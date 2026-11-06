@@ -47,6 +47,7 @@ from spindl.auth.http import (
     metadata_url,
     protect,
 )
+from spindl.auth.jwt import JwtAuthenticator
 from spindl.auth.scopes import Authoriser, ScopeAuthoriser
 
 __all__ = [
@@ -61,6 +62,7 @@ __all__ = [
     "DenialMode",
     "Identity",
     "InMemoryApiKeyStore",
+    "JwtAuthenticator",
     "METADATA_PATH",
     "ScopeAuthoriser",
     "TokenVerifier",
