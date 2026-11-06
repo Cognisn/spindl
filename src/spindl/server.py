@@ -388,6 +388,9 @@ class MCPServer:
                 )
 
         async def handle_messages(scope: Scope, receive: Receive, send: Send) -> None:
+            # The SDK runs each request in the context of the POST that
+            # carried it, so the prefix is read from that POST as well.
+            prefix_resolver.set_instance_prefix(_header(scope, "x-spindl-prefix"))
             await sse_transport.handle_post_message(scope, receive, send)
 
         routes: list[Any] = []
