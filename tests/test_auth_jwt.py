@@ -688,7 +688,8 @@ class TestJwks:
             (200, b'{"no_keys": []}'),
             (200, b'{"keys": "nope"}'),
             (200, b'{"keys": []}'),
-            (200, b'{"keys": [' + b" " * (1024 * 1024 + 10) + b"]}"),
+            # A usable key set, padded past the size limit.
+            (200, json.dumps({**STATIC_JWKS, "pad": "x" * 1024 * 1024}).encode()),
         ],
         ids=["500", "404", "not-json", "no-keys", "keys-not-list", "empty", "huge"],
     )
