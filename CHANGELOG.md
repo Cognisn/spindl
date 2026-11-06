@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- CI now also runs on pushes to workstream branches (`feat/**`, `fix/**`,
+  `docs/**`, `refactor/**`, `chore/**`, `test/**`, `perf/**`, `build/**`,
+  `ci/**`, `style/**`, `security/**`), so each workstream has a CI result
+  before it is merged
+
 ## [0.4.0] - 2026-10-27
 
 ### Added
