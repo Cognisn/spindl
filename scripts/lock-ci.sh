@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 override=$(mktemp)
 trap 'rm -f "$override"' EXIT
 printf 'mcp~=2.3.0\n' > "$override"
-uv pip compile pyproject.toml --extra dev --extra http --universal \
+uv pip compile pyproject.toml --extra dev --extra http --extra wsgi --universal \
   --python-version 3.10 --generate-hashes --override "$override" \
   --custom-compile-command "bash scripts/lock-ci.sh" \
   -o requirements/ci.txt
