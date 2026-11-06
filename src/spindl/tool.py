@@ -58,6 +58,9 @@ class BaseTool:
             name = "get_devices"
             description = "List all devices in the inventory"
             category = "inventory"
+            title = "Get devices"
+            read_only = True
+            destructive = False
             spooler_auto_detect = True
 
             class InputModel(BaseModel):
@@ -81,6 +84,17 @@ class BaseTool:
     spooler_auto_detect: bool = False
     InputModel: type[BaseModel] | None = None  # NOSONAR - PascalCase: class type
     reject_unknown_arguments: bool = True
+
+    # MCP tool annotations. ``None`` means undeclared: nothing is sent for
+    # it on ``tools/list``, so the host applies the specification's default
+    # (not read-only, possibly destructive, not idempotent, open world) and
+    # places the tool in its stricter group. A tool cannot be both
+    # ``read_only`` and ``destructive``; registration refuses that pair.
+    title: str | None = None
+    read_only: bool | None = None
+    destructive: bool | None = None
+    idempotent: bool | None = None
+    open_world: bool | None = None
 
     def accepted_arguments(self) -> list[str]:
         """Return the argument names this tool accepts, sorted.

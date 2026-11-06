@@ -22,6 +22,11 @@ class DescribeToolTool(BaseTool):
     name = "describe_tool"
     description = "Get detailed usage guide for a specific tool"
     category = "skills"
+    title = "Describe tool"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
 
     class InputModel(BaseModel):
         tool_name: str = Field(
