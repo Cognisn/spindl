@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.5.0a7] - 2026-11-05
+
+### Added
+- `spindl.auth.JwtAuthenticator`, a reference authenticator for JWT access
+  tokens issued by an external OAuth authorisation server. It verifies the
+  signature against the issuer's JWKS (fetched over HTTPS in a worker thread,
+  cached, refreshed for an unknown key id at most once per interval, and
+  failing closed when the keys cannot be fetched) or a static key set,
+  accepts only an allow-list of asymmetric algorithms (never `none` or HMAC),
+  and checks the issuer exactly, the audience against this server's resource
+  URL, and expiry and not-before with a leeway of at most 120 seconds.
+  Adopter callables map the verified claims to tool permissions (by default
+  the `scope` or `scp` claim) and to reach (required, so reach is always a
+  deliberate choice). `authorise` delegates to an optional authoriser;
+  without one every authenticated caller may use every tool. spindl remains a
+  resource server only
+
+### Changed
+- `pyjwt[crypto]` (MIT) is declared directly as a dependency, at the version
+  mcp 2.3 already requires, so no new package is installed
+
 ## [0.5.0a6] - 2026-11-05
 
 ### Added
