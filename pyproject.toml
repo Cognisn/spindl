@@ -22,6 +22,7 @@ classifiers = [
 dependencies = [
     "mcp>=2.3,<3",
     "pydantic>=2.0.0",
+    "pyjwt[crypto]>=2.10.1",
     "starlette>=0.27; python_version < '3.14'",
     "starlette>=0.48.0; python_version >= '3.14'",
 ]

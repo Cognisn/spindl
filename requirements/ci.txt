@@ -953,7 +953,7 @@ mcp==2.3.0 \
     --hash=sha256:8b147a50441cf059dc88c684e0aeed3687f0aa0f39c6cde7b90330effd2b34d8 \
     --hash=sha256:dd0c44c089d16453e8ae31a3877a0054d7a2314caaa81f5e0541b9b1734b2377
     # via
-    #   --override C:/Users/ADMINI~1/AppData/Local/Temp/2/tmp.KFyp6yhUiF
+    #   --override C:/Users/ADMINI~1/AppData/Local/Temp/2/tmp.SJXnPaOP0G
     #   cognisn-spindl (pyproject.toml)
 mcp-types==2.3.0 \
     --hash=sha256:968efdbdaedfab06adae40d378a34395f1090c5921d4be3c9cde283aaf76d91d \
@@ -1215,7 +1215,9 @@ pygments==2.21.0 \
 pyjwt==2.15.1 \
     --hash=sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193 \
     --hash=sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8
-    # via mcp
+    # via
+    #   cognisn-spindl (pyproject.toml)
+    #   mcp
 pytest==9.2.0 \
     --hash=sha256:07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588 \
     --hash=sha256:97c4f3b1f3c7414aa36465e09b8220f1d03627993bd51b1282e193753c80557b
