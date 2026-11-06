@@ -21,6 +21,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+CATEGORY_META_KEY = "com.cognisn.spindl/category"
+"""The ``_meta`` key that carries a tool's category on ``tools/list``.
+
+Follows the MCP rules for ``_meta`` key names: a reverse-DNS prefix of
+dot-separated labels the project controls, a slash, then the name. The
+``modelcontextprotocol`` and ``mcp`` prefixes are reserved and not used.
+"""
+
 ToolVisibility = Callable[[Optional["AccessToken"], BaseTool], bool]
 """Decides per request whether a tool is visible to the caller.
 
@@ -82,6 +90,12 @@ class ToolRegistry:
             raise ValueError("Tool must have a non-empty name")
         if tool.name in self._tools:
             raise ValueError(f"Tool name '{tool.name}' is already registered")
+        if tool.read_only is True and tool.destructive is True:
+            raise ValueError(
+                f"Tool '{tool.name}' declares read_only = True and "
+                f"destructive = True; a read-only tool cannot be destructive. "
+                f"Declare one or the other."
+            )
         self._tools[tool.name] = tool
         self._prefix_resolver.register_known_name(tool.name)
         logger.debug(
@@ -108,23 +122,69 @@ class ToolRegistry:
     def get_mcp_tool_definitions(self) -> list[Any]:
         """Return MCP Tool objects with prefixed names.
 
+        Each definition carries the tool's title and only the annotation
+        hints it declared, so an undeclared hint takes the specification's
+        default on the host. A non-empty category is sent in ``_meta``
+        under :data:`CATEGORY_META_KEY`.
+
         Imports mcp.types.Tool lazily to avoid hard dependency
         at import time.
         """
         from mcp.types import Tool
 
-        # Validate through the wire alias: the field is ``inputSchema`` on
-        # mcp 1.x and ``input_schema`` (alias ``inputSchema``) on 2.x.
         return [
-            Tool.model_validate(
-                {
-                    "name": self._prefix_resolver.prefixed_name(tool.name),
-                    "description": tool.description,
-                    "inputSchema": tool.input_schema,
-                }
-            )
+            Tool.model_validate(self._wire_definition(tool))
             for tool in self._visible_tools()
         ]
+
+    def _wire_definition(self, tool: BaseTool) -> dict[str, Any]:
+        """Build one tool's ``tools/list`` entry, keyed by wire field names."""
+        definition: dict[str, Any] = {
+            "name": self._prefix_resolver.prefixed_name(tool.name),
+            "description": tool.description,
+            "inputSchema": tool.input_schema,
+        }
+        if tool.title is not None:
+            definition["title"] = tool.title
+        hints = {
+            "title": tool.title,
+            "readOnlyHint": tool.read_only,
+            "destructiveHint": tool.destructive,
+            "idempotentHint": tool.idempotent,
+            "openWorldHint": tool.open_world,
+        }
+        annotations = {key: value for key, value in hints.items() if value is not None}
+        if annotations:
+            definition["annotations"] = annotations
+        if tool.category:
+            definition["_meta"] = {CATEGORY_META_KEY: tool.category}
+        return definition
+
+    def undeclared_tools(self) -> list[str]:
+        """Bare names, sorted, of tools declaring neither read_only nor destructive."""
+        return sorted(
+            tool.name
+            for tool in self._tools.values()
+            if tool.read_only is None and tool.destructive is None
+        )
+
+    def warn_undeclared_tools(self) -> None:
+        """Log one warning naming every tool that declares neither hint.
+
+        Hosts apply the specification's defaults to such a tool and treat
+        it as possibly destructive. Logs nothing when every tool declares
+        ``read_only`` or ``destructive``.
+        """
+        names = self.undeclared_tools()
+        if not names:
+            return
+        logger.warning(
+            "%d tool(s) declare neither read_only nor destructive, so hosts "
+            "treat them as possibly destructive: %s. Set read_only or "
+            "destructive on each tool class.",
+            len(names),
+            ", ".join(names),
+        )
 
     def get_tool_guide(self, wire_name: str) -> str | None:
         """Return the fully resolved guide for a tool.
@@ -138,19 +198,23 @@ class ToolRegistry:
         raw_guide = tool.guide()
         return self._prefix_resolver.resolve_placeholders(raw_guide)
 
-    def list_tools_metadata(self) -> list[dict[str, str]]:
+    def list_tools_metadata(self) -> list[dict[str, Any]]:
         """Return metadata for all tools, grouped by category.
 
-        Each entry includes the prefixed wire name, category,
-        and description.
+        Each entry includes the prefixed wire name, title, category,
+        description, and the ``read_only`` and ``destructive`` values
+        (``None`` when undeclared).
         """
-        result = []
+        result: list[dict[str, Any]] = []
         for tool in self._visible_tools():
             result.append(
                 {
                     "name": self._prefix_resolver.prefixed_name(tool.name),
+                    "title": tool.title,
                     "category": tool.category,
                     "description": tool.description,
+                    "read_only": tool.read_only,
+                    "destructive": tool.destructive,
                 }
             )
         # Sort by category then name for consistent output

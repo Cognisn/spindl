@@ -20,6 +20,11 @@ class ListToolsTool(BaseTool):
     name = "list_tools"
     description = "List all available tools with name, category, and description"
     category = "skills"
+    title = "List tools"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
 
     def __init__(self, registry: Any) -> None:
         self._registry = registry
@@ -51,7 +56,10 @@ class ListToolsTool(BaseTool):
                 categories[cat].append(
                     {
                         "name": tool["name"],
+                        "title": tool["title"],
                         "description": tool["description"],
+                        "read_only": tool["read_only"],
+                        "destructive": tool["destructive"],
                     }
                 )
 

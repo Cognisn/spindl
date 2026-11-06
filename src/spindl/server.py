@@ -106,6 +106,7 @@ class MCPServer:
         # Always register skills guide tools (last, so they see
         # all registered tools via the live registry reference)
         self._auto_register_skills_tools()
+        self._registry.warn_undeclared_tools()
 
         # Create the MCP SDK server with its protocol handlers
         from mcp.server import Server
