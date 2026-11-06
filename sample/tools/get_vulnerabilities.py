@@ -1,11 +1,14 @@
-"""Get vulnerabilities tool -- demonstrates explicit spooler_array_paths."""
+"""Get vulnerabilities tool: explicit spooler_array_paths, and reach applied
+through each finding's device."""
 
 import random
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+from tools.get_devices import DEVICE_LOCATIONS
+from tools.reach import ReachAwareTool, out_of_reach
 
-from spindl import BaseTool, ResponseEnvelope, ResponseMetadata
+from spindl import ResponseEnvelope, ResponseMetadata
 
 # Generate fake vulnerability data
 _SEVERITIES = ["critical", "high", "medium", "low", "informational"]
@@ -31,6 +34,7 @@ _TITLES = [
 random.seed(42)  # deterministic for demo purposes
 VULNERABILITIES = [  # NOSONAR - PRNG is intentional for deterministic sample data, not cryptographic use
     {
+        "finding_id": f"F-{n:03d}",
         "cve_id": f"{random.choice(_CVE_PREFIXES)}{random.randint(1000, 9999)}",
         "title": random.choice(_TITLES),
         "severity": random.choice(_SEVERITIES),
@@ -39,16 +43,22 @@ VULNERABILITIES = [  # NOSONAR - PRNG is intentional for deterministic sample da
         "status": random.choice(["open", "mitigated", "accepted"]),
         "first_seen": f"2024-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}",
     }
-    for _ in range(80)
+    for n in range(80)
 ]
 
 
-class GetVulnerabilitiesTool(BaseTool):
+class GetVulnerabilitiesTool(ReachAwareTool):
     """Retrieve vulnerability findings across devices."""
 
     name = "get_vulnerabilities"
     description = "Retrieve vulnerability findings across devices"
     category = "security"
+    title = "Get vulnerabilities"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    permissions = ["inventory:read"]
     spooler_array_paths = ["vulnerabilities"]  # explicit path declaration
 
     class InputModel(BaseModel):
@@ -74,8 +84,9 @@ class GetVulnerabilitiesTool(BaseTool):
     def guide(self) -> str:
         return (
             "# @get_vulnerabilities\n\n"
-            "Returns vulnerability findings. With 80 records in the demo "
-            "dataset, results will typically be spooled.\n\n"
+            "Returns vulnerability findings on devices at the sites your "
+            "key may see. With 80 records in the demo dataset, results will "
+            "typically be spooled.\n\n"
             "## Parameters\n\n"
             "- **device_id** (optional): Filter to a single device\n"
             "- **severity** (optional): Filter by severity level\n"
@@ -90,10 +101,18 @@ class GetVulnerabilitiesTool(BaseTool):
             "5. Use @get_devices to look up device details\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         validated = self.validate_input(params)
+        reach = self.caller_reach()
+        if reach is None:
+            return out_of_reach("This credential carries no site reach.")
 
-        results = VULNERABILITIES[:]
+        # Reach first, through each finding's device: every tool applies it.
+        results = [
+            v
+            for v in VULNERABILITIES
+            if DEVICE_LOCATIONS.get(v["device_id"]) in reach.locations
+        ]
 
         if validated.device_id:
             results = [v for v in results if v["device_id"] == validated.device_id]

@@ -1,10 +1,11 @@
-"""Get devices tool -- demonstrates a read tool with spooler auto-detect."""
+"""Get devices tool: a read-only tool that applies the caller's reach."""
 
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+from tools.reach import ReachAwareTool, out_of_reach
 
-from spindl import BaseTool, ResponseEnvelope, ResponseMetadata
+from spindl import ResponseEnvelope, ResponseMetadata
 
 # OS name constants
 OS_UBUNTU_22 = "Ubuntu 22.04"
@@ -16,14 +17,15 @@ OS_RHEL_8 = "RHEL 8"
 OS_MACOS_14 = "macOS 14"
 OS_DEBIAN_12 = "Debian 12"
 
-# Fake device inventory data
+# Synthetic device inventory: example.com host names and addresses from the
+# documentation range 192.0.2.0/24.
 DEVICES = [
     {
         "id": f"DEV-{i:04d}",
-        "hostname": f"srv-{i:04d}.corp.local",
+        "hostname": f"srv-{i:04d}.example.com",
         "os": os,
         "status": status,
-        "ip": f"10.0.{i // 256}.{i % 256}",
+        "ip": f"192.0.2.{10 + i}",
         "location": loc,
         "owner": owner,
         "cpu_cores": cores,
@@ -56,13 +58,22 @@ DEVICES = [
     )
 ]
 
+ALL_LOCATIONS = frozenset(d["location"] for d in DEVICES)
+DEVICE_LOCATIONS = {d["id"]: d["location"] for d in DEVICES}
 
-class GetDevicesTool(BaseTool):
+
+class GetDevicesTool(ReachAwareTool):
     """List devices in the inventory with optional filtering."""
 
     name = "get_devices"
     description = "List devices in the inventory with optional filtering"
     category = "inventory"
+    title = "Get devices"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    permissions = ["inventory:read"]
     spooler_auto_detect = True  # let the spooler find arrays automatically
 
     class InputModel(BaseModel):
@@ -84,9 +95,9 @@ class GetDevicesTool(BaseTool):
     def guide(self) -> str:
         return (
             "# @get_devices\n\n"
-            "Returns a list of devices from the inventory. Results may be "
-            "spooled if the response is large -- use @spooler_query to "
-            "page through spooled results.\n\n"
+            "Returns devices from the inventory at the sites your key may "
+            "see. Results may be spooled if the response is large -- use "
+            "@spooler_query to page through spooled results.\n\n"
             "## Parameters\n\n"
             "- **status** (optional): Filter by status "
             "(online / offline / degraded)\n"
@@ -103,10 +114,14 @@ class GetDevicesTool(BaseTool):
             "vulnerability posture\n"
         )
 
-    async def execute(self, **params: Any) -> dict:
+    async def execute(self, **params: Any) -> dict[str, Any]:
         validated = self.validate_input(params)
+        reach = self.caller_reach()
+        if reach is None:
+            return out_of_reach("This credential carries no site reach.")
 
-        results = DEVICES[:]
+        # Reach first: the caller only ever sees devices at its own sites.
+        results = [d for d in DEVICES if d["location"] in reach.locations]
 
         if validated.status:
             results = [d for d in results if d["status"] == validated.status]
