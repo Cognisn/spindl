@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [0.5.0a5] - 2026-11-05
+
+### Added
+- `spindl.auth.Authenticator`: one protocol with
+  `authenticate(credentials)`, returning an `Identity` (subject, client id,
+  tool permissions, reach and expiry), and
+  `authorise(identity, tool, action)`, deciding tool access for listing and
+  calling. Configure it with `AuthConfig(authenticator=...)`. spindl reads the
+  credentials, answers the `401` and `403` challenges, serves the RFC 9728
+  metadata and filters tools
+- `AuthConfig.credential_headers` names headers (for example `X-API-Key`)
+  that spindl reads and passes to the authenticator in `Credentials`, besides
+  `Authorization: Bearer`
+- `AuthConfig.denial_mode = "step_up"` keeps a tool listed when the caller
+  lacks some of its permissions and answers a call with HTTP `403`
+  `insufficient_scope` naming the missing permissions. The default, `"hide"`,
+  answers a denied tool exactly as an unknown tool, as in 0.4
+- `BaseTool.permissions` declares the permissions a tool needs. They are
+  advertised, with the configured scopes, as `scopes_supported` in the
+  protected-resource metadata. Registering a permission that is not a valid
+  OAuth scope token raises `ValueError`
+- `BaseTool.context`, a read-only per-call `ToolContext` with the caller's
+  identity, reach and instance prefix, isolated between concurrent calls
+- Reach, failing closed: with an authenticator configured, a tool runs only
+  when the caller's identity carries reach, unless the tool sets
+  `requires_reach = False`. Tool access and reach are separate controls:
+  being allowed to call a tool never limits what it touches, so tools apply
+  `self.context.reach` themselves
+- `Credentials`, `Identity`, `Authenticator` and `ToolContext` are exported
+  from `spindl`
+
+### Changed
+- `spindl.auth` is a package; every name the 0.4 module exported is still
+  available
+- `current_identity()` returns an `Identity`. With the deprecated
+  `token_verifier` it is an `AccessTokenIdentity`, which keeps the 0.4
+  `scopes` and `token` attributes
+- spindl's built-in tools (`list_tools`, `describe_tool` and the `spooler_*`
+  tools) set `requires_reach = False`
+- `ToolRegistry` gains asynchronous lookups that apply the authenticator's
+  decision; its synchronous lookups raise `RuntimeError` on a server with an
+  authenticator or a visibility hook
+
+### Deprecated
+- `AuthConfig(token_verifier=...)` and `MCPServer(tool_visibility=...)`. Both
+  keep their 0.4 behaviour through adapters and log a deprecation warning;
+  neither can be combined with an authenticator
+
 ## [0.5.0a4] - 2026-11-05
 
 ### Added
