@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [0.5.0a3] - 2026-11-05
+
+### Added
+- `BaseTool` declares `title`, `read_only`, `destructive`, `idempotent` and
+  `open_world`. `tools/list` sends the title and only the declared hints as
+  MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  `openWorldHint`), so hosts such as Claude Desktop can group tools by what
+  they do; undeclared hints take the MCP defaults
+- A tool's category is sent in its `_meta` under
+  `com.cognisn.spindl/category`
+- spindl logs one warning at start-up naming every tool that declares neither
+  `read_only` nor `destructive`
+- `list_tools` returns each tool's title and its `read_only` and
+  `destructive` values
+
+### Changed
+- spindl's built-in tools (`list_tools`, `describe_tool` and the `spooler_*`
+  tools) declare themselves read-only, non-destructive, idempotent and
+  closed-world, with titles
+- Registering a tool that declares both `read_only = True` and
+  `destructive = True` raises `ValueError`
+
 ## [0.5.0a2] - 2026-11-05
 
 ### Changed
