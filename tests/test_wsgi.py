@@ -29,6 +29,7 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import BaseModel
 from werkzeug.serving import make_server as make_werkzeug_server
 
+import spindl
 from spindl.auth import AuthConfig, current_identity
 from spindl.server import MCPServer
 from spindl.tool import BaseTool
@@ -51,6 +52,14 @@ AUTH_SERVER_URL = "https://auth.example.com/"
 # SPINDL_TEST_WSGI_PORT to keep the listener inside a reserved block.
 TEST_PORT = int(os.environ.get("SPINDL_TEST_WSGI_PORT", "0"))
 LOOP_THREAD = "spindl-wsgi"
+
+
+def subprocess_env() -> dict[str, str]:
+    """Environment for a child Python that imports this spindl checkout."""
+    src = os.path.dirname(os.path.dirname(os.path.abspath(spindl.__file__)))
+    existing = os.environ.get("PYTHONPATH")
+    path = src if not existing else os.pathsep.join([src, existing])
+    return {**os.environ, "PYTHONPATH": path}
 
 
 class EchoTool(BaseTool):
@@ -584,6 +593,7 @@ class TestLifecycle:
         proc = subprocess.run(
             [sys.executable, str(script)],
             capture_output=True,
+            env=subprocess_env(),
             text=True,
             timeout=60,
         )
@@ -613,7 +623,11 @@ class TestOptionalDependencies:
             print("ok", loaded)
             """)
         proc = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, text=True, timeout=60
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=subprocess_env(),
         )
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "ok []"
@@ -625,7 +639,11 @@ class TestOptionalDependencies:
             "if m in sys.modules))"
         )
         proc = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, text=True, timeout=60
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=subprocess_env(),
         )
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "[]"
