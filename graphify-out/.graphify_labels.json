@@ -1,6 +1,5 @@
 {
   "2": "Spool Query Engine",
-  "3": "Protocol Tests",
   "5": "Spool Storage Backend",
   "6": "Spooler Package Imports",
   "9": "Registry and Error Modules",
@@ -13,7 +12,6 @@
   "24": "Feature Request Template",
   "25": "Spooler Configuration",
   "26": "Placeholder Resolution",
-  "29": "Prefix Stripping",
   "33": "Issue Template Config",
   "39": "Version Script",
   "40": "Lock Script",
