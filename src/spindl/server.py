@@ -9,7 +9,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from spindl.auth import AuthConfig
 from spindl.prefix import PrefixResolver
@@ -18,6 +18,15 @@ from spindl.responses.errors import ErrorDetail, StructuredError
 from spindl.spooler.config import SpoolerConfig
 from spindl.spooler.spooler import ResponseSpooler
 from spindl.tool import BaseTool, ToolInputError
+
+if TYPE_CHECKING:
+    from mcp.server.context import ServerRequestContext
+    from mcp.types import (
+        CallToolRequestParams,
+        CallToolResult,
+        ListToolsResult,
+        PaginatedRequestParams,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +107,14 @@ class MCPServer:
         # all registered tools via the live registry reference)
         self._auto_register_skills_tools()
 
-        # Create MCP SDK server and register handlers
+        # Create the MCP SDK server with its protocol handlers
         from mcp.server import Server
 
-        self._mcp_server = Server(self._server_name)
-        self._register_handlers()
+        self._mcp_server = Server(
+            self._server_name,
+            on_list_tools=self._on_list_tools,
+            on_call_tool=self._on_call_tool,
+        )
         self._setup_done = True
 
     def _auto_register_spooler_tools(self) -> None:
@@ -128,52 +140,26 @@ class MCPServer:
         self._registry.register(ListToolsTool(registry=self._registry))
         self._registry.register(DescribeToolTool(registry=self._registry))
 
-    def _register_handlers(self) -> None:
-        """Wire MCP protocol handlers to the SDK server.
+    async def _on_list_tools(  # NOSONAR - the SDK requires a coroutine
+        self,
+        ctx: "ServerRequestContext[Any]",
+        params: "PaginatedRequestParams | None",
+    ) -> "ListToolsResult":
+        """Answer ``tools/list`` with the tools visible to this request."""
+        from mcp.types import ListToolsResult
 
-        The mcp SDK changed its low-level registration API in 2.0: 1.x
-        exposes ``list_tools`` and ``call_tool`` decorators, 2.x exposes
-        ``add_request_handler(method, params_type, handler)`` with a
-        ``(ctx, params) -> result`` handler. Both are supported.
-        """
-        if hasattr(self._mcp_server, "add_request_handler"):
-            self._register_handlers_v2()
-        else:
-            self._register_handlers_v1()
+        return ListToolsResult(tools=self._registry.get_mcp_tool_definitions())
 
-    def _register_handlers_v1(self) -> None:
-        from mcp.types import TextContent, Tool
+    async def _on_call_tool(
+        self,
+        ctx: "ServerRequestContext[Any]",
+        params: "CallToolRequestParams",
+    ) -> "CallToolResult":
+        """Answer ``tools/call`` by dispatching to the named tool."""
+        from mcp.types import CallToolResult
 
-        @self._mcp_server.list_tools()  # type: ignore[untyped-decorator]
-        async def handle_list_tools() -> list[Tool]:
-            return self._registry.get_mcp_tool_definitions()
-
-        @self._mcp_server.call_tool()  # type: ignore[untyped-decorator]
-        async def handle_call_tool(
-            name: str, arguments: dict[str, Any] | None
-        ) -> list[TextContent]:
-            return await self._handle_call_tool(name, arguments)
-
-    def _register_handlers_v2(self) -> None:
-        from mcp import types
-
-        async def handle_list_tools(  # NOSONAR - SDK requires a coroutine
-            ctx: Any, params: Any
-        ) -> types.ListToolsResult:
-            return types.ListToolsResult(
-                tools=self._registry.get_mcp_tool_definitions()
-            )
-
-        async def handle_call_tool(ctx: Any, params: Any) -> types.CallToolResult:
-            content = await self._handle_call_tool(params.name, params.arguments)
-            return types.CallToolResult(content=content)
-
-        self._mcp_server.add_request_handler(
-            "tools/list", types.PaginatedRequestParams, handle_list_tools
-        )
-        self._mcp_server.add_request_handler(
-            "tools/call", types.CallToolRequestParams, handle_call_tool
-        )
+        content = await self._handle_call_tool(params.name, params.arguments)
+        return CallToolResult(content=content)
 
     async def _handle_call_tool(
         self, name: str, arguments: dict[str, Any] | None
