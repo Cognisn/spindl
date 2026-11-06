@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.5.0a4] - 2026-11-05
+
+### Added
+- `MCPServer.wsgi_app()` serves the HTTP streamable transport from any WSGI
+  (PEP 3333) application. It runs the endpoint and its lifespan on an event
+  loop in a background thread owned by spindl, with authentication, instance
+  prefixing and tool visibility unchanged. Responses are JSON; Server-Sent
+  Events are not offered through WSGI
+- `spindl.wsgi.init_app(app, server, path="/mcp")` mounts a server on a Flask
+  application, including the RFC 9728 protected-resource metadata path when
+  it is served
+- `WsgiBridge.close()` stops the bridge's lifespan and joins its thread; it
+  also runs when the interpreter exits
+- A `wsgi` extra (`pip install cognisn-spindl[wsgi]`) that installs `a2wsgi`
+
+### Changed
+- CI's locked test environment includes the `wsgi` extra and Flask for the
+  bridge tests
+
 ## [0.5.0a3] - 2026-11-05
 
 ### Added
