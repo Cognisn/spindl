@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
 ### Changed
 - The package metadata now declares the licence as
   `LicenseRef-MIT-Commons-Clause`, a PEP 639 licence expression, with
