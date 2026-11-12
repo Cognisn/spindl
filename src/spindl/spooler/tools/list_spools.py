@@ -16,6 +16,12 @@ class SpoolerListSpoolsTool(BaseTool):
     name = "spooler_list"
     description = "List all available spooled data sets with their metadata"
     category = "spooler"
+    title = "List spools"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    requires_reach = False
 
     def __init__(self, spooler: Any) -> None:
         self._spooler = spooler

@@ -20,6 +20,12 @@ class SpoolerDistinctTool(BaseTool):
         "data, optionally narrowed by the same filters as spooler_query"
     )
     category = "spooler"
+    title = "Distinct spool values"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    requires_reach = False
 
     class InputModel(BaseModel):
         spool_id: str = Field(

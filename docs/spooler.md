@@ -40,13 +40,17 @@ server = MCPServer(
 )
 ```
 
-This automatically registers 4 spooler query tools.
+This automatically registers 4 spooler query tools. They declare themselves
+read-only, non-destructive, idempotent and closed-world (see
+[Annotations](annotations.md)), and set `requires_reach = False`: a spool
+holds only what a tool already returned to the caller, and spools are
+confined to the caller (see [Scope](#scope)).
 
 ## Configuration
 
 ```python
 SpoolerConfig(
-    db_path="/tmp/mcp_spooler.db",  # SQLite file location
+    db_path="spooler.db",            # SQLite file location
     max_inline_tokens=2000,          # Token estimate threshold
     max_inline_items=10,             # Array item count threshold
     default_page_size=20,            # Default records per page
@@ -63,13 +67,14 @@ Every setting can be overridden with an environment variable:
 
 | Setting | Env Var | Default |
 |---------|---------|---------|
-| `db_path` | `SPOOLER_DB_PATH` | `/tmp/mcp_spooler.db` |
+| `db_path` | `SPOOLER_DB_PATH` | `mcp_spooler.db` in the system temporary folder |
 | `max_inline_tokens` | `SPOOLER_MAX_INLINE_TOKENS` | `2000` |
 | `max_inline_items` | `SPOOLER_MAX_INLINE_ITEMS` | `10` |
 | `default_page_size` | `SPOOLER_DEFAULT_PAGE_SIZE` | `20` |
 | `max_page_size` | `SPOOLER_MAX_PAGE_SIZE` | `50` |
 | `summary_sample_size` | `SPOOLER_SUMMARY_SAMPLE_SIZE` | `3` |
 | `db_cleanup_on_exit` | `SPOOLER_CLEANUP_ON_EXIT` | `true` |
+| `default_ttl_seconds` | `SPOOLER_DEFAULT_TTL_SECONDS` | none (spools do not expire) |
 
 ## Tool Opt-In
 
@@ -78,6 +83,8 @@ Tools must explicitly opt in to spooling:
 ### Explicit Array Paths
 
 ```python
+from spindl import BaseTool
+
 class ListDevices(BaseTool):
     spooler_array_paths = ["devices"]
     # data["devices"] will be checked and spooled if large
@@ -88,6 +95,26 @@ Supports dot notation for nested paths:
 ```python
 spooler_array_paths = ["Results", "data.items", "response.records"]
 ```
+
+<!-- docs-test
+from spindl.spooler import ResponseSpooler
+
+nested = ResponseSpooler(SpoolerConfig(db_path="nested.db", max_inline_items=5))
+await nested.initialise_async()
+nested_summary = await nested.process_response(
+    {
+        "Results": [{"n": n} for n in range(8)],
+        "data": {"items": [{"n": n} for n in range(8)]},
+    },
+    source_tool="nested_demo",
+    array_paths=spooler_array_paths,
+)
+await nested.cleanup_async()
+assert sorted(s["source_array"] for s in nested_summary["spooled_data"]) == [
+    "Results",
+    "data.items",
+]
+-->
 
 ### Auto-Detect
 
@@ -271,6 +298,21 @@ filtered answer. An explicit error is recovered from in one turn.
 See [Building Tools](building-tools.md#argument-validation) for how this
 applies to tools you write.
 
+<!-- docs-test
+from spindl.spooler import SQLiteSpoolBackend
+
+
+class MySharedBackend(SQLiteSpoolBackend):
+    """Stands in for a shared database backend in this example."""
+
+    def __init__(self, pool: object) -> None:
+        super().__init__(SpoolerConfig(db_path="shared.db"))
+        self.pool = pool
+
+
+pool = object()
+-->
+
 ## Storage Backends
 
 Storage sits behind the `SpoolBackend` protocol (`spindl.spooler.backend`).
@@ -292,6 +334,12 @@ server = MCPServer(
     spooler=SpoolerConfig(backend=MySharedBackend(pool)),
 )
 ```
+
+<!-- docs-test
+await server._setup()
+assert "spooler_query" in server._prefix_resolver.known_names
+await server._cleanup()
+-->
 
 A backend implements these `async` methods. Tool dispatch runs on the MCP
 SDK's event loop, so a network backend must not block it: use a native async
@@ -324,10 +372,17 @@ response shape (`spool_id`, `total_records`, `sample_records`, `query_hint`,
 A spool created with a scope is visible only to reads carrying the same
 scope. Reads without a scope see every spool, which is the behaviour when
 authentication is off. When authentication is enabled (see
-[transports.md](transports.md)) and `scope_from_identity` is true (the
-default), the spooler uses the caller's token subject as the scope, so one
-caller cannot list or query another caller's spools. `process_response` also
-accepts an explicit `scope=` for callers that manage tenancy themselves.
+[Authentication](authentication.md)) and `scope_from_identity` is true (the
+default), the spooler uses the caller's `Identity.subject` (falling back to
+its client id) as the scope, so one caller cannot list or query another
+caller's spools. `process_response` also accepts an explicit `scope=` for
+callers that manage tenancy themselves.
+
+The scope is the caller's subject, never its reach or permissions. A spool
+holds only what the tool returned, so it is exactly as narrow as the tool's
+own reach check made it: a tool that applies `self.context.reach` produces
+spools that respect it, and one that does not leaks through the spool too.
+See [Tool access is not reach](authentication.md#tool-access-is-not-reach).
 
 ### Expiry
 
@@ -362,7 +417,28 @@ The database uses WAL journal mode and NORMAL synchronous for performance.
 
 ## Lifecycle
 
-1. **Initialise**: `await spooler.initialise()` -- creates SQLite file and schema
-2. **Process**: `await spooler.process_response(response, source_tool, array_paths)` -- stores arrays
-3. **Query**: `QueryEngine(connection, config).query(spool_id, ...)` -- reads data
-4. **Cleanup**: `await spooler.cleanup()` -- closes connection, optionally deletes file
+`MCPServer` drives the spooler for you. Driving it yourself looks like this:
+
+```python
+from spindl.spooler import ResponseSpooler
+
+spooler = ResponseSpooler(SpoolerConfig(db_path="lifecycle.db", max_inline_items=5))
+await spooler.initialise_async()                 # 1. open the backend and schema
+summary = await spooler.process_response(        # 2. store large arrays
+    {"devices": [{"id": n, "os": "Linux"} for n in range(40)]},
+    source_tool="list_devices",
+    array_paths=["devices"],
+)
+spool_id = summary["spooled_data"][0]["spool_id"]
+page = await spooler.backend.query(spool_id, page_size=10)  # 3. read it back
+await spooler.cleanup_async()                    # 4. close, and delete the file if configured
+```
+
+<!-- docs-test
+assert summary["spooled_data"][0]["total_records"] == 40
+assert len(page["results"]) == 10
+assert page["pagination"]["total_records"] == 40
+-->
+
+The synchronous `initialise()` and `cleanup()` do the same for the SQLite
+backend outside an event loop.

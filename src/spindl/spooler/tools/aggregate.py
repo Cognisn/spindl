@@ -17,6 +17,12 @@ class SpoolerAggregateTool(BaseTool):
     name = "spooler_aggregate"
     description = "Aggregate spooled data with grouping and summary functions"
     category = "spooler"
+    title = "Aggregate spool"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    requires_reach = False
 
     class InputModel(BaseModel):
         spool_id: str = Field(

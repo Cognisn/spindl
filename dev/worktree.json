@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "python": {
+    "version": "3.12",
+    "install": ["-e", ".[dev,http]"],
+    "import_check": "spindl"
+  },
+  "services": [],
+  "notes": "Library: no Compose services or testcontainers. Lock files need uv and Git Bash (scripts/lock-ci.sh)."
+}

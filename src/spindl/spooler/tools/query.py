@@ -17,6 +17,12 @@ class SpoolerQueryTool(BaseTool):
     name = "spooler_query"
     description = "Query spooled data with filtering, sorting, and pagination"
     category = "spooler"
+    title = "Query spool"
+    read_only = True
+    destructive = False
+    idempotent = True
+    open_world = False
+    requires_reach = False
 
     class InputModel(BaseModel):
         spool_id: str = Field(

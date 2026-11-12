@@ -152,7 +152,7 @@ class TestHttpAuth:
             async with streamable_http_client(
                 RESOURCE_URL, http_client=http_client
             ) as streams:
-                # mcp 1.x yields (read, write, get_session_id); 2.x yields (read, write)
+                # The mcp 2.x client yields the read and write streams
                 read, write = streams[0], streams[1]
                 async with ClientSession(read, write) as session:
                     await session.initialize()
@@ -254,7 +254,7 @@ class TestMountableTransports:
             async with streamable_http_client(
                 RESOURCE_URL, http_client=http_client
             ) as streams:
-                # mcp 1.x yields (read, write, get_session_id); 2.x yields (read, write)
+                # The mcp 2.x client yields the read and write streams
                 read, write = streams[0], streams[1]
                 async with ClientSession(read, write) as session:
                     await session.initialize()

@@ -24,6 +24,8 @@ Examples:
 Set in code by the developer. Mandatory. Cannot be changed at runtime.
 
 ```python
+from spindl import MCPServer
+
 server = MCPServer(prefix="secops")
 ```
 
@@ -35,6 +37,20 @@ MCPServer(prefix=" SecOps_ ") # → "secops"
 ```
 
 An empty or whitespace-only prefix raises `ValueError`.
+
+<!-- docs-test
+from spindl import PrefixResolver
+
+assert PrefixResolver("SecOps").server_prefix == "secops"
+assert PrefixResolver(" SecOps_ ").server_prefix == "secops"
+for bad in ("", "   "):
+    try:
+        MCPServer(prefix=bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"prefix {bad!r} should be refused")
+-->
 
 ## Level 2: Instance Prefix
 
@@ -54,7 +70,7 @@ This applies to all requests for the server's lifetime.
 X-Spindl-Prefix: staging
 ```
 
-This applies per-request and takes **precedence over the environment variable**. Only available with HTTP/SSE transports.
+This applies per-request and takes **precedence over the environment variable**. Only available with the HTTP, SSE and WSGI transports. On SSE, send it on the `GET` that opens the stream and on every `POST` to the messages endpoint: spindl reads it from the `POST` that carries each request.
 
 ### Precedence
 
@@ -80,6 +96,19 @@ def guide(self) -> str:
         "See @spooler_aggregate for grouping."
     )
 ```
+
+<!-- docs-test
+from spindl import PrefixResolver
+
+placeholder_resolver = PrefixResolver("secops")
+for known in ("list_devices", "spooler_query", "spooler_aggregate"):
+    placeholder_resolver.register_known_name(known)
+assert placeholder_resolver.resolve_placeholders(guide(None)) == (
+    "Use secops_list_devices to get all devices. "
+    "Query large results with secops_spooler_query. "
+    "See secops_spooler_aggregate for grouping."
+)
+-->
 
 ### Resolution Rules
 
@@ -172,11 +201,25 @@ resolver.full_prefix        # "prod_secops" or "secops"
 resolver.known_names        # frozenset of registered bare names
 
 # Methods
+resolver.register_known_name("get_devices")     # Register for @resolution
 resolver.prefixed_name("get_devices")           # "secops_get_devices"
 resolver.strip_prefix("secops_get_devices")     # "get_devices"
 resolver.strip_prefix("other_get_devices")      # None
 resolver.resolve_placeholders("Use @get_devices") # "Use secops_get_devices"
-resolver.register_known_name("get_devices")     # Register for @resolution
 resolver.set_instance_prefix("prod")            # Set per-request prefix
 resolver.set_instance_prefix(None)              # Clear per-request prefix
 ```
+
+<!-- docs-test
+assert resolver.server_prefix == "secops"
+assert resolver.known_names == frozenset({"get_devices"})
+assert resolver.prefixed_name("get_devices") == "secops_get_devices"
+assert resolver.strip_prefix("secops_get_devices") == "get_devices"
+assert resolver.strip_prefix("other_get_devices") is None
+assert resolver.resolve_placeholders("Use @get_devices") == "Use secops_get_devices"
+resolver.set_instance_prefix("prod")
+assert resolver.full_prefix == "prod_secops"
+assert resolver.prefixed_name("get_devices") == "prod_secops_get_devices"
+resolver.set_instance_prefix(None)
+assert resolver.instance_prefix is None and resolver.full_prefix == "secops"
+-->

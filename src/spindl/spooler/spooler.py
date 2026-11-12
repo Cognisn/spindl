@@ -82,9 +82,11 @@ class ResponseSpooler:
     def current_scope(self) -> Optional[str]:
         """Scope applied to spools created or read in this request.
 
-        Returns the authenticated caller's subject (or client id) when
-        ``scope_from_identity`` is set and a request is authenticated,
-        otherwise ``None``.
+        Returns the authenticated caller's ``Identity.subject`` (falling
+        back to its client id) when ``scope_from_identity`` is set and a
+        request is authenticated, otherwise ``None``. Spools are confined to
+        the subject, never to the caller's reach or permissions, so two
+        callers of one client application never share spools.
         """
         if not self.config.scope_from_identity:
             return None

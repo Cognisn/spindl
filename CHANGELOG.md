@@ -2,6 +2,214 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
+### Changed
+- The package metadata now declares the licence as
+  `LicenseRef-MIT-Commons-Clause`, a PEP 639 licence expression, with
+  `LICENSE` as the licence file. The licence itself is unchanged. Building
+  spindl now needs setuptools 77 or later
+
+### Fixed
+- The links in `README.md` now point to the v0.5.0 documentation and sample
+  on GitHub, so they work on the PyPI page. The documentation link test
+  skips absolute links
+
+## [0.5.0b1] - 2026-11-06
+
+Upgrading from 0.4: see [docs/upgrading-0.5.md](docs/upgrading-0.5.md) for
+the `mcp` 2.3 floor, the deprecated 0.4 authentication interfaces, tool
+annotations and the reach requirement that comes with an `Authenticator`.
+
+### Added
+- Documentation for 0.5: `docs/authentication.md` covers the
+  `Authenticator`, `Identity`, `Credentials` and `ToolContext`, the `401` and
+  `403` challenges, the `hide` and `step_up` denial modes, permissions and
+  `scopes_supported`, the reference API key, scope and JWT implementations,
+  and why tool access is not reach; `docs/annotations.md` covers tool
+  annotations, the start-up warning and the category in `_meta`;
+  `docs/upgrading-0.5.md` is a guide to upgrading from 0.4
+- Every Python example in `README.md` and `docs/` runs in CI, with checks of
+  what each example claims, so the documentation cannot drift from the API
+- The sample server declares annotations and permissions, authenticates with
+  `ApiKeyAuthenticator` and `ScopeAuthoriser` using demo keys generated at
+  start-up, applies the caller's reach in every tool, and can run mounted in
+  a Flask application. A test starts it over HTTP streamable and through
+  Flask
+
+### Changed
+- `README.md` and the transports, architecture, building tools, spooler,
+  prefix and skills guides describe 0.5, including the `wsgi` extra and WSGI
+  in the transport comparison. `docs/visibility.md` now points to the
+  authentication guide
+
+### Fixed
+- The documentation no longer says the `mcp` 1.x SDK is supported, gives
+  Python 3.10 as the minimum, names the published package `cognisn-spindl` in
+  install commands, and states that SSE clients must send `X-Spindl-Prefix`
+  on the messages `POST`s as well as the `GET`
+- When uvicorn is missing, `run_http()` and `run_sse()` now say to install
+  `cognisn-spindl[http]`, the published package name, rather than
+  `spindl[http]`. The two docstrings say the same
+
+## [0.5.0a7] - 2026-11-05
+
+### Added
+- `spindl.auth.JwtAuthenticator`, a reference authenticator for JWT access
+  tokens issued by an external OAuth authorisation server. It verifies the
+  signature against the issuer's JWKS (fetched over HTTPS in a worker thread,
+  cached, refreshed for an unknown key id at most once per interval, and
+  failing closed when the keys cannot be fetched) or a static key set,
+  accepts only an allow-list of asymmetric algorithms (never `none` or HMAC),
+  and checks the issuer exactly, the audience against this server's resource
+  URL, and expiry and not-before with a leeway of at most 120 seconds.
+  Adopter callables map the verified claims to tool permissions (by default
+  the `scope` or `scp` claim) and to reach (required, so reach is always a
+  deliberate choice). `authorise` delegates to an optional authoriser;
+  without one every authenticated caller may use every tool. spindl remains a
+  resource server only
+
+### Changed
+- `pyjwt[crypto]` (MIT) is declared directly as a dependency, at the version
+  mcp 2.3 already requires, so no new package is installed
+
+## [0.5.0a6] - 2026-11-05
+
+### Added
+- `spindl.auth.api_key.ApiKeyAuthenticator`, a reference `Authenticator` for
+  API keys. It reads the key from a header (`X-API-Key` by default) or, when
+  `accept_bearer=True`, from `Authorization: Bearer`, hashes it with SHA-256,
+  looks the digest up in an `ApiKeyStore`, compares digests in constant time
+  and refuses expired and revoked keys. The plaintext key is never stored,
+  logged or shown. Pass `credential_headers=authenticator.credential_headers`
+  to `AuthConfig`
+- `ApiKeyRecord`, the `ApiKeyStore` protocol and `InMemoryApiKeyStore`, with
+  `generate_api_key(prefix)` (256 random bits from `secrets`) and
+  `hash_api_key(key)`. Keys must be random; never use a human-chosen password
+  as an API key
+- `spindl.auth.scopes.ScopeAuthoriser`, which allows a tool when the caller
+  holds every permission the tool declares (a tool declaring none is allowed
+  for any authenticated caller), and the `Authoriser` protocol it implements.
+  It composes into any authenticator, including
+  `ApiKeyAuthenticator(authoriser=ScopeAuthoriser())` and a product's own
+- These API key and authoriser names are also exported from `spindl.auth`
+
+## [0.5.0a5] - 2026-11-05
+
+### Added
+- `spindl.auth.Authenticator`: one protocol with
+  `authenticate(credentials)`, returning an `Identity` (subject, client id,
+  tool permissions, reach and expiry), and
+  `authorise(identity, tool, action)`, deciding tool access for listing and
+  calling. Configure it with `AuthConfig(authenticator=...)`. spindl reads the
+  credentials, answers the `401` and `403` challenges, serves the RFC 9728
+  metadata and filters tools
+- `AuthConfig.credential_headers` names headers (for example `X-API-Key`)
+  that spindl reads and passes to the authenticator in `Credentials`, besides
+  `Authorization: Bearer`
+- `AuthConfig.denial_mode = "step_up"` keeps a tool listed when the caller
+  lacks some of its permissions and answers a call with HTTP `403`
+  `insufficient_scope` naming the missing permissions. The default, `"hide"`,
+  answers a denied tool exactly as an unknown tool, as in 0.4
+- `BaseTool.permissions` declares the permissions a tool needs. They are
+  advertised, with the configured scopes, as `scopes_supported` in the
+  protected-resource metadata. Registering a permission that is not a valid
+  OAuth scope token raises `ValueError`
+- `BaseTool.context`, a read-only per-call `ToolContext` with the caller's
+  identity, reach and instance prefix, isolated between concurrent calls
+- Reach, failing closed: with an authenticator configured, a tool runs only
+  when the caller's identity carries reach, unless the tool sets
+  `requires_reach = False`. Tool access and reach are separate controls:
+  being allowed to call a tool never limits what it touches, so tools apply
+  `self.context.reach` themselves
+- `Credentials`, `Identity`, `Authenticator` and `ToolContext` are exported
+  from `spindl`
+
+### Changed
+- `spindl.auth` is a package; every name the 0.4 module exported is still
+  available
+- `current_identity()` returns an `Identity`. With the deprecated
+  `token_verifier` it is an `AccessTokenIdentity`, which keeps the 0.4
+  `scopes` and `token` attributes
+- spindl's built-in tools (`list_tools`, `describe_tool` and the `spooler_*`
+  tools) set `requires_reach = False`
+- `ToolRegistry` gains asynchronous lookups that apply the authenticator's
+  decision; its synchronous lookups raise `RuntimeError` on a server with an
+  authenticator or a visibility hook
+
+### Deprecated
+- `AuthConfig(token_verifier=...)` and `MCPServer(tool_visibility=...)`. Both
+  keep their 0.4 behaviour through adapters and log a deprecation warning;
+  neither can be combined with an authenticator
+
+## [0.5.0a4] - 2026-11-05
+
+### Added
+- `MCPServer.wsgi_app()` serves the HTTP streamable transport from any WSGI
+  (PEP 3333) application. It runs the endpoint and its lifespan on an event
+  loop in a background thread owned by spindl, with authentication, instance
+  prefixing and tool visibility unchanged. Responses are JSON; Server-Sent
+  Events are not offered through WSGI
+- `spindl.wsgi.init_app(app, server, path="/mcp")` mounts a server on a Flask
+  application, including the RFC 9728 protected-resource metadata path when
+  it is served
+- `WsgiBridge.close()` stops the bridge's lifespan and joins its thread; it
+  also runs when the interpreter exits
+- A `wsgi` extra (`pip install cognisn-spindl[wsgi]`) that installs `a2wsgi`
+
+### Changed
+- CI's locked test environment includes the `wsgi` extra and Flask for the
+  bridge tests
+
+## [0.5.0a3] - 2026-11-05
+
+### Added
+- `BaseTool` declares `title`, `read_only`, `destructive`, `idempotent` and
+  `open_world`. `tools/list` sends the title and only the declared hints as
+  MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  `openWorldHint`), so hosts such as Claude Desktop can group tools by what
+  they do; undeclared hints take the MCP defaults
+- A tool's category is sent in its `_meta` under
+  `com.cognisn.spindl/category`
+- spindl logs one warning at start-up naming every tool that declares neither
+  `read_only` nor `destructive`
+- `list_tools` returns each tool's title and its `read_only` and
+  `destructive` values
+
+### Changed
+- spindl's built-in tools (`list_tools`, `describe_tool` and the `spooler_*`
+  tools) declare themselves read-only, non-destructive, idempotent and
+  closed-world, with titles
+- Registering a tool that declares both `read_only = True` and
+  `destructive = True` raises `ValueError`
+
+## [0.5.0a2] - 2026-11-05
+
+### Changed
+- spindl now requires `mcp>=2.3,<3` and speaks MCP protocol revision
+  2026-07-28 on every transport, while still answering clients that use the
+  `initialize` handshake
+- `starlette` is declared as a direct dependency, at the floor `mcp` 2.3
+  requires
+- CI tests one hash-locked environment, `requirements/ci.txt`, on the newest
+  `mcp` 2.3.x
+
+### Removed
+- Support for the `mcp` 1.x SDK, its handler registration path and the `mcp1`
+  CI lock
+
+### Fixed
+- `X-Spindl-Prefix` now takes effect on the SSE transport, where `mcp` 2.x
+  handles each request in the context of its messages POST
+
+## [0.5.0a1] - 2026-11-05
+
+### Changed
+- CI now also runs on pushes to workstream branches (`feat/**`, `fix/**`,
+  `docs/**`, `refactor/**`, `chore/**`, `test/**`, `perf/**`, `build/**`,
+  `ci/**`, `style/**`, `security/**`), so each workstream has a CI result
+  before it is merged
+
 ## [0.4.0] - 2026-10-27
 
 ### Added

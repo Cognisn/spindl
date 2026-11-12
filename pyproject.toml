@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ dynamic = ["version"]
 description = "Python framework for building MCP servers with hierarchical tool prefixing, skills guides, and response spooling."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = "LicenseRef-MIT-Commons-Clause"
+license-files = ["LICENSE"]
 authors = [
     { name = "Matthew Westwood-Hill" },
 ]
@@ -20,13 +21,19 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "mcp>=1.25.0,<3.0.0",
+    "mcp>=2.3,<3",
     "pydantic>=2.0.0",
+    "pyjwt[crypto]>=2.10.1",
+    "starlette>=0.27; python_version < '3.14'",
+    "starlette>=0.48.0; python_version >= '3.14'",
 ]
 
 [project.optional-dependencies]
 http = [
     "uvicorn>=0.30.0",
+]
+wsgi = [
+    "a2wsgi>=1.10.0",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -37,6 +44,8 @@ dev = [
     "mypy>=1.8.0",
     "black>=24.0.0",
     "isort>=5.13.0",
+    "a2wsgi>=1.10.0",
+    "flask>=3.0.0",
 ]
 
 [tool.setuptools.packages.find]

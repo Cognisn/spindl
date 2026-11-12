@@ -1,6 +1,7 @@
 """Tests for MCPServer."""
 
 import asyncio
+import builtins
 
 import pytest
 from pydantic import BaseModel, Field
@@ -183,3 +184,18 @@ class TestMCPServerArgumentValidation:
 
         data = await self._call(Lenient(), {"anything": 1})
         assert data["seen"] == ["anything"]
+
+
+class TestServeInstallHint:
+    async def test_missing_uvicorn_names_the_published_package(self, monkeypatch):
+        real_import = builtins.__import__
+
+        def no_uvicorn(name, *args, **kwargs):
+            if name == "uvicorn":
+                raise ImportError("No module named 'uvicorn'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", no_uvicorn)
+        server = MCPServer(prefix="test")
+        with pytest.raises(ImportError, match=r"pip install cognisn-spindl\[http\]"):
+            await server._serve(object(), "127.0.0.1", 0)

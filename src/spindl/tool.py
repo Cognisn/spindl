@@ -9,10 +9,12 @@ fully prefixed wire names by the PrefixResolver at render time.
 """
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ValidationError
 
+from spindl.auth._context import current_tool_context
+from spindl.auth._types import ToolContext
 from spindl.responses.errors import ErrorDetail, StructuredError
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,9 @@ class BaseTool:
             name = "get_devices"
             description = "List all devices in the inventory"
             category = "inventory"
+            title = "Get devices"
+            read_only = True
+            destructive = False
             spooler_auto_detect = True
 
             class InputModel(BaseModel):
@@ -81,6 +86,44 @@ class BaseTool:
     spooler_auto_detect: bool = False
     InputModel: type[BaseModel] | None = None  # NOSONAR - PascalCase: class type
     reject_unknown_arguments: bool = True
+
+    # MCP tool annotations. ``None`` means undeclared: nothing is sent for
+    # it on ``tools/list``, so the host applies the specification's default
+    # (not read-only, possibly destructive, not idempotent, open world) and
+    # places the tool in its stricter group. A tool cannot be both
+    # ``read_only`` and ``destructive``; registration refuses that pair.
+    title: str | None = None
+    read_only: bool | None = None
+    destructive: bool | None = None
+    idempotent: bool | None = None
+    open_world: bool | None = None
+
+    # Tool access and reach. ``permissions`` names the tool permissions
+    # (OAuth scope tokens) a caller needs; spindl advertises them in the
+    # protected-resource metadata and the authenticator's ``authorise``
+    # decides whether a caller may list and call the tool. That decision is
+    # tool access only: it never limits what the tool touches. Reach, what
+    # a permitted call may touch, arrives as ``self.context.reach`` and the
+    # tool must apply it itself. With an ``Authenticator`` configured, a
+    # tool requires reach unless ``requires_reach`` is False, and spindl
+    # refuses the call, before any tool code runs, when the credential
+    # carries none. ``None`` means the default (required).
+    permissions: list[str] = []
+    requires_reach: bool | None = None
+
+    @property
+    def context(self) -> Optional[ToolContext]:
+        """The call this tool is serving: identity, reach and instance prefix.
+
+        Read-only, and private to each call: one tool instance serves
+        concurrent calls, so the value lives in a context variable rather
+        than on the instance. ``None`` outside a call.
+
+        ``context.reach`` is what this call may touch. spindl does not
+        enforce it; passing the access check never limits what the tool
+        touches, so apply it to every query the tool makes.
+        """
+        return current_tool_context()
 
     def accepted_arguments(self) -> list[str]:
         """Return the argument names this tool accepts, sorted.
