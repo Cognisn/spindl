@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- SonarCloud no longer analyses the generated code graph in `graphify-out/`
+
 ## [0.5.0] - 2026-11-12
 
 ### Changed
