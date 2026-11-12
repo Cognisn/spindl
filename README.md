@@ -192,7 +192,7 @@ secured._session_manager = None
 A call without a valid key gets `401`; a key without `devices:read` never
 sees the tool. Passing that check never limits what a tool touches, which is
 why the tool filters by `self.context.reach` itself: read
-[Tool access is not reach](docs/authentication.md#tool-access-is-not-reach)
+[Tool access is not reach](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/authentication.md#tool-access-is-not-reach)
 before writing tools for a shared server.
 
 ## Prefix System
@@ -219,7 +219,7 @@ assert resolver.resolve_placeholders(guide(None)) == (
 )
 -->
 
-See [Prefix System](docs/prefix-system.md).
+See [Prefix System](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/prefix-system.md).
 
 ## Transports
 
@@ -251,7 +251,7 @@ assert resp.status_code == 200
 secured.wsgi_app().close()
 -->
 
-See [Transports](docs/transports.md).
+See [Transports](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/transports.md).
 
 ## Response Types
 
@@ -292,16 +292,16 @@ assert failure["success"] is False and failure["error"]["error_code"] == "AUTH_E
 
 | Page | Covers |
 |------|--------|
-| [Building Tools](docs/building-tools.md) | Tool classes, inputs, argument validation, guides, return values, spooling |
-| [Annotations](docs/annotations.md) | `title`, `read_only`, `destructive`, `idempotent`, `open_world`, the start-up warning, category in `_meta` |
-| [Authentication and Tool Access](docs/authentication.md) | `Authenticator`, `Identity`, `401` and `403`, denial modes, permissions, reach, the reference API key, scope and JWT implementations |
-| [Transports](docs/transports.md) | stdio, HTTP streamable, SSE, mounting in ASGI gateways, WSGI and Flask |
-| [Prefix System](docs/prefix-system.md) | Server and instance prefixes, `@placeholder` resolution |
-| [Skills Guide](docs/skills-guide.md) | `list_tools` and `describe_tool` |
-| [Response Spooler](docs/spooler.md) | Spooling large arrays, the query tools, backends, scope and expiry |
-| [Architecture](docs/architecture.md) | How the components fit together |
-| [Upgrading from 0.4](docs/upgrading-0.5.md) | Moving a 0.4 server to 0.5 |
-| [Sample server](sample/README.md) | A runnable server using annotations, API keys, reach and Flask |
+| [Building Tools](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/building-tools.md) | Tool classes, inputs, argument validation, guides, return values, spooling |
+| [Annotations](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/annotations.md) | `title`, `read_only`, `destructive`, `idempotent`, `open_world`, the start-up warning, category in `_meta` |
+| [Authentication and Tool Access](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/authentication.md) | `Authenticator`, `Identity`, `401` and `403`, denial modes, permissions, reach, the reference API key, scope and JWT implementations |
+| [Transports](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/transports.md) | stdio, HTTP streamable, SSE, mounting in ASGI gateways, WSGI and Flask |
+| [Prefix System](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/prefix-system.md) | Server and instance prefixes, `@placeholder` resolution |
+| [Skills Guide](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/skills-guide.md) | `list_tools` and `describe_tool` |
+| [Response Spooler](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/spooler.md) | Spooling large arrays, the query tools, backends, scope and expiry |
+| [Architecture](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/architecture.md) | How the components fit together |
+| [Upgrading from 0.4](https://github.com/Cognisn/spindl/blob/v0.5.0/docs/upgrading-0.5.md) | Moving a 0.4 server to 0.5 |
+| [Sample server](https://github.com/Cognisn/spindl/blob/v0.5.0/sample/README.md) | A runnable server using annotations, API keys, reach and Flask |
 
 ## Requirements
 

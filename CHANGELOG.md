@@ -8,6 +8,11 @@
   `LICENSE` as the licence file. The licence itself is unchanged. Building
   spindl now needs setuptools 77 or later
 
+### Fixed
+- The links in `README.md` now point to the v0.5.0 documentation and sample
+  on GitHub, so they work on the PyPI page. The documentation link test
+  skips absolute links
+
 ## [0.5.0b1] - 2026-11-06
 
 Upgrading from 0.4: see [docs/upgrading-0.5.md](docs/upgrading-0.5.md) for

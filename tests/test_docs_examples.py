@@ -291,7 +291,7 @@ def test_every_python_block_is_collected(page):
     assert len(visible) == fenced
 
 
-LINK = re.compile(r"\]\(([^)#\s]+\.md)(#[^)\s]*)?\)")
+LINK = re.compile(r"\]\((?![a-z]+://)([^)#\s]+\.md)(#[^)\s]*)?\)")
 
 
 def _anchors(page: Path) -> set[str]:
