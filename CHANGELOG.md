@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- The package metadata now declares the licence as
+  `LicenseRef-MIT-Commons-Clause`, a PEP 639 licence expression, with
+  `LICENSE` as the licence file. The licence itself is unchanged. Building
+  spindl now needs setuptools 77 or later
+
 ## [0.5.0b1] - 2026-11-06
 
 Upgrading from 0.4: see [docs/upgrading-0.5.md](docs/upgrading-0.5.md) for

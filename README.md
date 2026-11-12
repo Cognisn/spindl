@@ -314,4 +314,4 @@ assert failure["success"] is False and failure["error"]["error_code"] == "AUTH_E
 
 ## Licence
 
-MIT
+MIT with the Commons Clause condition; see [LICENSE](https://github.com/Cognisn/spindl/blob/v0.5.0/LICENSE).
